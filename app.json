@@ -1,0 +1,66 @@
+{
+  "expo": {
+    "name": "VVS",
+    "slug": "vvs",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/logo.png",
+    "scheme": "vvs",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "icon": "./assets/images/logo.png",
+      "bundleIdentifier": "com.vvs.matrimony"
+    },
+    "android": {
+      "icon": "./assets/images/logo.png",
+      "package": "com.vvs.matrimony",
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/logo.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FFFFFF",
+          "image": "./assets/images/logo.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "android": {
+            "image": "./assets/images/logo.png",
+            "imageWidth": 200,
+            "resizeMode": "contain"
+          },
+          "ios": {
+            "image": "./assets/images/logo.png",
+            "imageWidth": 200,
+            "resizeMode": "contain"
+          }
+        }
+      ],
+      "expo-font",
+      "expo-web-browser",
+      "expo-secure-store",
+      "@react-native-community/datetimepicker"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "14b5c724-ddef-4133-b847-5f491612b973"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/14b5c724-ddef-4133-b847-5f491612b973"
+    }
+  }
+}

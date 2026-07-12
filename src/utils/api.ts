@@ -1,0 +1,307 @@
+import Constants from 'expo-constants';
+import { storage } from './storage';
+import type {
+  SendOtpRequest,
+  SendOtpResponse,
+  VerifyOtpRequest,
+  AuthResponse,
+  User,
+  UserProfile,
+  UserPhoto,
+  Biodata,
+  ApiResponse,
+  CreateProfileRequest,
+  UpdateProfileRequest,
+} from './types';
+
+// Auto-detect backend URL from Expo dev server host
+function getBaseUrl(): string {
+  // Allow explicit override
+  const envUrl = process.env.EXPO_PUBLIC_API_URL;
+  if (envUrl) return envUrl;
+
+  // In Expo Go, Constants.expoConfig?.hostUri gives us "192.168.x.x:8081"
+  // We extract just the IP and use port 3000 (backend port)
+  const hostUri = Constants.expoConfig?.hostUri;
+  if (hostUri) {
+    const ip = hostUri.split(':')[0];
+    return `http://${ip}:3000/api`;
+  }
+
+  // Fallback for web or production
+  return 'http://localhost:3000/api';
+}
+
+const BASE_URL = getBaseUrl();
+
+let isRefreshing = false;
+let refreshPromise: Promise<string | null> | null = null;
+let cachedToken: string | null = null;
+let sessionExpiredCallback: (() => void) | null = null;
+
+export function setCachedToken(token: string | null) {
+  cachedToken = token;
+}
+
+export function registerSessionExpiredCallback(cb: () => void) {
+  sessionExpiredCallback = cb;
+}
+
+async function refreshAccessToken(): Promise<string | null> {
+  try {
+    const refreshToken = await storage.getRefreshToken();
+    if (!refreshToken) return null;
+
+    const response = await fetch(`${BASE_URL}/auth/refresh-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    if (response.status === 401 || response.status === 400) {
+      // The refresh token itself is invalid or expired
+      return 'AUTH_FAILED';
+    }
+
+    if (!response.ok) {
+      // Server error or other transient issue
+      return null;
+    }
+
+    const data = await response.json();
+    if (data.accessToken) {
+      await storage.setAccessToken(data.accessToken);
+      setCachedToken(data.accessToken); // Update cache
+      return data.accessToken;
+    }
+    return null;
+  } catch {
+    // Network error
+    return null;
+  }
+}
+
+async function getValidToken(): Promise<string | null> {
+  if (isRefreshing && refreshPromise) {
+    return refreshPromise;
+  }
+  if (cachedToken) {
+    return cachedToken;
+  }
+  const token = await storage.getAccessToken();
+  cachedToken = token;
+  return token;
+}
+
+async function request<T>(
+  endpoint: string,
+  options: RequestInit = {},
+  requiresAuth = true,
+  retried = false,
+): Promise<T> {
+  const headers: Record<string, string> = {
+    ...((options.headers as Record<string, string>) || {}),
+  };
+
+  // Don't set Content-Type for FormData (multipart)
+  if (!(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  if (requiresAuth) {
+    const token = await getValidToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  }
+
+  const url = `${BASE_URL}${endpoint}`;
+  console.log(`[API] ${options.method || 'GET'} ${url}`);
+  console.log(`[API] Headers:`, JSON.stringify(headers));
+
+  const response = await fetch(url, {
+    ...options,
+    headers,
+  });
+
+  // Handle 401 — try refresh token once
+  if (response.status === 401 && requiresAuth && !retried) {
+    if (!isRefreshing) {
+      isRefreshing = true;
+      refreshPromise = refreshAccessToken();
+    }
+
+    const newToken = await refreshPromise;
+    isRefreshing = false;
+    refreshPromise = null;
+
+    if (newToken && newToken !== 'AUTH_FAILED') {
+      return request<T>(endpoint, options, requiresAuth, true);
+    }
+
+    if (newToken === 'AUTH_FAILED') {
+      // Refresh failed permanently — clear tokens and trigger logout
+      await storage.clearAll();
+      setCachedToken(null);
+      if (sessionExpiredCallback) {
+        sessionExpiredCallback();
+      }
+      throw new Error('SESSION_EXPIRED');
+    }
+
+    // If newToken is null, it was a transient network error.
+    // We do NOT clear tokens, keeping the user logged in for retry.
+    throw new Error('UNAUTHORIZED');
+  }
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || `Request failed with status ${response.status}`);
+  }
+
+  return data as T;
+}
+
+// ─── Auth API ─────────────────────────────────────────────────────────────────
+
+export const authApi = {
+  sendOtp: (body: SendOtpRequest) =>
+    request<SendOtpResponse>('/auth/send-otp', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }, false),
+
+  verifyOtp: (body: VerifyOtpRequest) =>
+    request<Partial<AuthResponse> & { message: string }>('/auth/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }, false),
+
+  getMe: () =>
+    request<{ message: string; user: User }>('/auth/me'),
+
+  logout: (sessionId: number) =>
+    request<{ message: string }>('/auth/logout', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId }),
+    }, false),
+
+  refreshToken: (refreshToken: string) =>
+    request<{ accessToken: string }>('/auth/refresh-token', {
+      method: 'POST',
+      body: JSON.stringify({ refreshToken }),
+    }, false),
+};
+
+// ─── Profile API ──────────────────────────────────────────────────────────────
+
+export const profileApi = {
+  setupProfile: async (data: CreateProfileRequest) => {
+    return request<ApiResponse<User>>('/profile/setup', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  getMyProfile: () =>
+    request<ApiResponse<User>>('/profile/myProfile'),
+
+  getUserProfile: (userId: number) =>
+    request<ApiResponse<User>>(`/profile/user/${userId}`),
+
+  getAllProfiles: (page: number, limit: number) =>
+    request<ApiResponse<UserProfile[]>>(`/profile/getAllProfiles?page=${page}&limit=${limit}`),
+
+  searchProfiles: (body: {
+    search?: string;
+    gender?: string;
+    maritalStatus?: string;
+    country?: string;
+    state?: string;
+    city?: string;
+    education?: string;
+    profession?: string;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }) =>
+    request<ApiResponse<UserProfile[]>>('/common/profiles/search', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateProfile: (data: UpdateProfileRequest) =>
+    request<ApiResponse<UserProfile>>('/profile/update', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  uploadPhoto: async (photoUri: string) => {
+    const formData = new FormData();
+    const filename = photoUri.split('/').pop() || 'photo.jpg';
+    const match = /\.([\w]+)$/.exec(filename);
+    const type = match ? `image/${match[1]}` : 'image/jpeg';
+    formData.append('photo', {
+      uri: photoUri,
+      name: filename,
+      type,
+    } as any);
+
+    return request<ApiResponse<UserPhoto>>('/profile/upload-photo', {
+      method: 'POST',
+      body: formData,
+    });
+  },
+
+  getMyPhotos: () =>
+    request<ApiResponse<UserPhoto[]>>('/profile/photos'),
+
+  uploadBiodata: async (fileUri: string, biodataType: 'uploaded' | 'generated') => {
+    const formData = new FormData();
+    const filename = fileUri.split('/').pop() || 'biodata.pdf';
+    formData.append('biodata', {
+      uri: fileUri,
+      name: filename,
+      type: 'application/pdf',
+    } as any);
+    formData.append('biodataType', biodataType);
+
+    return request<ApiResponse<Biodata>>('/profile/biodata', {
+      method: 'POST',
+      body: formData,
+    });
+  },
+  generateBiodata: (data: {
+    fullName: string;
+    gender: 'male' | 'female';
+    maritalStatus: 'never_married' | 'divorced' | 'widowed';
+    dateOfBirth: string;
+    city?: string;
+    profession?: string;
+    education?: string;
+    religion?: string;
+    caste?: string;
+    fatherName?: string;
+    motherName?: string;
+    bio?: string;
+  }) =>
+    request<ApiResponse<Biodata>>('/profile/biodata/generate', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  deleteBiodata: () =>
+    request<ApiResponse>('/profile/biodata', {
+      method: 'DELETE',
+    }),
+
+  deleteAccount: () =>
+    request<ApiResponse>('/profile/account', {
+      method: 'DELETE',
+    }),
+};
+
+// Export base URL for debugging
+export { BASE_URL };
