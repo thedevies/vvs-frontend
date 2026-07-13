@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { CustomAlert as Alert } from '@/utils/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -39,6 +40,7 @@ export default function ExploreScreen() {
   const [minAge, setMinAge] = useState(18);
   const [maxAge, setMaxAge] = useState(45);
 
+
   // Dynamic profiles fetching states
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(false);
@@ -63,7 +65,6 @@ export default function ExploreScreen() {
   };
 
   const loadProfiles = useCallback(async (pageNum: number, isRefresh = false) => {
-    if (!profileCompleted) return;
     try {
       if (isRefresh) {
         setRefreshing(true);
@@ -73,24 +74,35 @@ export default function ExploreScreen() {
         setLoadingMore(true);
       }
 
-      const filterBody: any = {
-        page: pageNum,
-        limit: 10,
-        sortBy: 'createdAt',
-        sortOrder: 'desc',
-      };
+      const usePublicApi = !user || !profileCompleted;
+      let response;
+      if (usePublicApi) {
+        console.log(`[Explore] Fetching public profiles page ${pageNum}...`);
+        response = await profileApi.getPublicProfiles(pageNum, 10);
+      } else {
+        const filterBody: any = {
+          page: pageNum,
+          limit: 10,
+          sortBy: 'createdAt',
+          sortOrder: 'desc',
+        };
 
-      if (selectedEducation !== 'All') {
-        filterBody.education = selectedEducation;
+        if (searchText.trim()) {
+          filterBody.search = searchText.trim();
+        }
+
+        if (selectedEducation !== 'All') {
+          filterBody.education = selectedEducation;
+        }
+
+        const activeLocation = cityInput.trim() || (selectedLocation !== 'All' ? selectedLocation : '');
+        if (activeLocation) {
+          filterBody.city = activeLocation;
+        }
+
+        console.log(`[Explore] Fetching searchProfiles page ${pageNum} with body:`, JSON.stringify(filterBody));
+        response = await profileApi.searchProfiles(filterBody);
       }
-
-      const activeLocation = cityInput.trim() || (selectedLocation !== 'All' ? selectedLocation : '');
-      if (activeLocation) {
-        filterBody.city = activeLocation;
-      }
-
-      console.log(`[Explore] Fetching searchProfiles page ${pageNum} with body:`, JSON.stringify(filterBody));
-      const response = await profileApi.searchProfiles(filterBody);
       
       if (response.data) {
         const newProfiles = response.data;
@@ -135,11 +147,11 @@ export default function ExploreScreen() {
       setRefreshing(false);
       setLoadingMore(false);
     }
-  }, [profileCompleted, selectedEducation, selectedLocation, cityInput, minAge, maxAge, user]);
+  }, [profileCompleted, selectedEducation, selectedLocation, cityInput, minAge, maxAge, user, searchText]);
 
   useEffect(() => {
     loadProfiles(1);
-  }, [selectedEducation, selectedLocation, cityInput, minAge, maxAge]);
+  }, [selectedEducation, selectedLocation, cityInput, minAge, maxAge, profileCompleted, user, searchText]);
 
   const onRefresh = useCallback(() => {
     loadProfiles(1, true);
@@ -163,26 +175,7 @@ export default function ExploreScreen() {
   const decMaxAge = () => setMaxAge((prev) => Math.max(prev - 1, minAge + 1));
   const incMaxAge = () => setMaxAge((prev) => Math.min(MAX_AGE_LIMIT, Math.max(prev + 1, minAge + 1)));
 
-  // ── Locked guard (matches Search page structure) ──────────────────────────
-  if (!profileCompleted) {
-    return (
-      <View style={styles.mainContainer}>
-        <SafeAreaView style={styles.container}>
-          <View style={styles.lockedPageWrap}>
-            <View style={styles.lockedIconWrap}>
-              <Feather name="lock" size={28} color="#D0D0D5" />
-            </View>
-            <ThemedText style={styles.lockedTitle}>Discover is locked</ThemedText>
-            <ThemedText style={styles.lockedBody}>To enable this, complete your profile.</ThemedText>
-            <TouchableOpacity style={styles.unlockButton} onPress={() => router.push('/edit-profile')}>
-              <ThemedText style={styles.unlockButtonText}>Complete Profile</ThemedText>
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
-        <BottomNavigation />
-      </View>
-    );
-  }
+  // ── Explore page is unlocked for guest view ──
 
   // ── Defined after guard, matching Search page ─────────────────────────────
   const hasAppliedFilters =
@@ -208,11 +201,27 @@ export default function ExploreScreen() {
         <View style={styles.header}>
           <ThemedText style={styles.headerTitle}>Discover Profiles</ThemedText>
           <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.iconButton} onPress={() => setSearchOpen((prev) => !prev)}>
+              <Feather name="search" size={20} color={searchOpen ? "#FF4D8D" : "#fff"} />
+            </TouchableOpacity>
             <TouchableOpacity style={styles.iconButton} onPress={() => setFiltersOpen((prev) => !prev)}>
-              <Feather name="sliders" size={20} color="#fff" />
+              <Feather name="sliders" size={20} color={filtersOpen ? "#FF4D8D" : "#fff"} />
             </TouchableOpacity>
           </View>
         </View>
+
+        {searchOpen && (
+          <View style={styles.searchWrap}>
+            <Feather name="search" size={16} color="#9B9BA1" />
+            <TextInput
+              value={searchText}
+              onChangeText={setSearchText}
+              placeholder="Search by name, role, city..."
+              placeholderTextColor="#777"
+              style={styles.searchInput}
+            />
+          </View>
+        )}
 
         <View style={styles.resultRow}>
           <View style={styles.resultPill}>
@@ -353,7 +362,15 @@ export default function ExploreScreen() {
                       key={profile.id}
                       activeOpacity={0.9}
                       style={styles.profileCard}
-                      onPress={() =>
+                      onPress={() => {
+                        if (!profileCompleted) {
+                          Alert.alert(
+                            'Profile Incomplete',
+                            'Please complete your profile to view other member details and send interest requests.'
+                          );
+                          router.push('/edit-profile');
+                          return;
+                        }
                         router.push({
                           pathname: '/profile',
                           params: {
@@ -374,8 +391,8 @@ export default function ExploreScreen() {
                             image: imageUrl,
                             isConnection: 'false',
                           },
-                        })
-                      }>
+                        });
+                      }}>
                       <Image source={{ uri: imageUrl }} style={styles.avatar} />
                       <View style={styles.profileMeta}>
                         <View style={styles.nameRow}>

@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
     Alert,
     Image,
@@ -7,33 +7,17 @@ import {
     StyleSheet,
     TouchableOpacity,
     View,
+    ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import BottomNavigation from "@/components/navigation/BottomNavigation";
 import { ThemedText } from "@/components/themed-text";
+import { interestApi, BASE_URL } from "@/utils/api";
 
 export default function RequestsScreen() {
-  const [requests, setRequests] = useState<any[]>([
-    {
-      id: 1,
-      name: "Kiara",
-      age: "25",
-      role: "Software Engineer",
-      city: "Mumbai",
-      image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=1200&auto=format&fit=crop",
-      time: "2h ago",
-    },
-    {
-      id: 2,
-      name: "Aisha",
-      age: "27",
-      role: "Doctor",
-      city: "Pune",
-      image: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=1200&auto=format&fit=crop",
-      time: "1d ago",
-    }
-  ]);
+  const [requests, setRequests] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
   const [notifications, setNotifications] = useState<any[]>([
     {
@@ -52,13 +36,84 @@ export default function RequestsScreen() {
     }
   ]);
 
-  const handleAcceptRequest = (name: string, id: number) => {
-    Alert.alert("Request Accepted", `You are now connected with ${name}!`);
-    setRequests(prev => prev.filter(r => r.id !== id));
+  useEffect(() => {
+    fetchReceivedInterests();
+  }, []);
+
+  const getPhotoUrl = (path?: string | null): string => {
+    if (!path) return 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=1200&auto=format&fit=crop';
+    if (path.startsWith('http')) return path;
+    const baseUrl = BASE_URL.replace('/api', '');
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    return `${baseUrl}${cleanPath}`;
   };
 
-  const handleDeclineRequest = (id: number) => {
-    setRequests(prev => prev.filter(r => r.id !== id));
+  const formatRelativeTime = (dateStr: string): string => {
+    try {
+      const diffMs = Date.now() - new Date(dateStr).getTime();
+      const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+      if (diffHrs < 1) {
+        const diffMins = Math.floor(diffMs / (1000 * 60));
+        return `${Math.max(1, diffMins)}m ago`;
+      }
+      if (diffHrs < 24) {
+        return `${diffHrs}h ago`;
+      }
+      return `${Math.floor(diffHrs / 24)}d ago`;
+    } catch {
+      return "Just now";
+    }
+  };
+
+  const fetchReceivedInterests = async () => {
+    try {
+      setLoading(true);
+      const response = await interestApi.getReceivedInterests(1, 100);
+      if (response.data) {
+        const mapped = (response.data as any[]).map((item: any) => {
+          const profile = item.profile || {};
+          const age = profile.dateOfBirth
+            ? String(Math.floor((Date.now() - new Date(profile.dateOfBirth).getTime()) / (365.25 * 24 * 60 * 60 * 1000)))
+            : "25";
+          
+          return {
+            id: item.interestId,
+            name: profile.fullName || "User",
+            age,
+            role: profile.profession || "N/A",
+            city: profile.city || "N/A",
+            image: getPhotoUrl(profile.profilePhoto),
+            time: formatRelativeTime(item.createdAt),
+            status: item.status,
+          };
+        });
+        setRequests(mapped.filter((r: any) => r.status === 'PENDING'));
+      }
+    } catch (err: any) {
+      console.log('[Requests] Failed to load interests:', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAcceptRequest = async (name: string, interestId: number) => {
+    try {
+      await interestApi.acceptInterest(interestId);
+      Alert.alert("Request Accepted", `You are now connected with ${name}!`);
+      setRequests(prev => prev.filter(r => r.id !== interestId));
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Failed to accept interest request.");
+    }
+  };
+
+  const handleDeclineRequest = async (interestId: number) => {
+    try {
+      await interestApi.cancelInterest(interestId);
+      Alert.alert("Declined", "Connection request declined.");
+      setRequests(prev => prev.filter(r => r.id !== interestId));
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Failed to decline interest request.");
+    }
   };
 
   const handleDismissNotification = (id: string) => {
@@ -78,39 +133,51 @@ export default function RequestsScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContainer}
         >
-          {/* Connection Requests Section */}
-          {requests.length > 0 && (
-            <View style={styles.sectionContainer}>
-              <ThemedText style={styles.sectionHeader}>Connection Requests</ThemedText>
-              <View style={styles.requestsList}>
-                {requests.map((request) => (
-                  <View key={request.id} style={styles.requestCard}>
-                    <Image source={{ uri: request.image }} style={styles.requestAvatar} />
-                    <View style={styles.requestContent}>
-                      <ThemedText style={styles.requestText}>
-                        <ThemedText style={styles.boldText}>{request.name}</ThemedText> • {request.role}
-                      </ThemedText>
-                      <ThemedText style={styles.requestTimeText}>{request.time} • {request.city}</ThemedText>
-                      
-                      <View style={styles.requestActionRow}>
-                        <TouchableOpacity 
-                          style={styles.miniAcceptBtn}
-                          onPress={() => handleAcceptRequest(request.name, request.id)}
-                        >
-                          <ThemedText style={styles.miniBtnText}>Accept</ThemedText>
-                        </TouchableOpacity>
-                        <TouchableOpacity 
-                          style={styles.miniDeclineBtn}
-                          onPress={() => handleDeclineRequest(request.id)}
-                        >
-                          <ThemedText style={styles.miniBtnTextDecline}>Decline</ThemedText>
-                        </TouchableOpacity>
+          {loading ? (
+            <ActivityIndicator size="large" color="#FF4D8D" style={{ marginVertical: 32 }} />
+          ) : (
+            <>
+              {requests.length > 0 ? (
+                <View style={styles.sectionContainer}>
+                  <ThemedText style={styles.sectionHeader}>Connection Requests</ThemedText>
+                  <View style={styles.requestsList}>
+                    {requests.map((request) => (
+                      <View key={request.id} style={styles.requestCard}>
+                        <Image source={{ uri: request.image }} style={styles.requestAvatar} />
+                        <View style={styles.requestContent}>
+                          <ThemedText style={styles.requestText}>
+                            <ThemedText style={styles.boldText}>{request.name}</ThemedText> • {request.role}
+                          </ThemedText>
+                          <ThemedText style={styles.requestTimeText}>{request.time} • {request.city}</ThemedText>
+                          
+                          <View style={styles.requestActionRow}>
+                            <TouchableOpacity 
+                              style={styles.miniAcceptBtn}
+                              onPress={() => handleAcceptRequest(request.name, request.id)}
+                            >
+                              <ThemedText style={styles.miniBtnText}>Accept</ThemedText>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                              style={styles.miniDeclineBtn}
+                              onPress={() => handleDeclineRequest(request.id)}
+                            >
+                              <ThemedText style={styles.miniBtnTextDecline}>Decline</ThemedText>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
                       </View>
-                    </View>
+                    ))}
                   </View>
-                ))}
-              </View>
-            </View>
+                </View>
+              ) : (
+                <View style={styles.sectionContainer}>
+                  <ThemedText style={styles.sectionHeader}>Connection Requests</ThemedText>
+                  <View style={styles.emptyState}>
+                    <ThemedText style={styles.emptyText}>No pending requests</ThemedText>
+                  </View>
+                </View>
+              )}
+            </>
           )}
 
           {/* Activity / Notifications Section */}

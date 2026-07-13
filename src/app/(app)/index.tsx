@@ -1,6 +1,5 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from "react";
 import {
-  Alert,
   Animated,
   Dimensions,
   ImageBackground,
@@ -9,50 +8,184 @@ import {
   StyleSheet,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
-import BottomNavigation from '@/components/navigation/BottomNavigation';
-import { ThemedText } from '@/components/themed-text';
-import { useAuth } from '@/context/AuthContext';
-import { useLanguage } from '@/context/LanguageContext';
-import { profileApi, BASE_URL } from '@/utils/api';
-import AuthModal from '@/components/ui/AuthModal';
+  ActivityIndicator,
+} from "react-native";
+import { CustomAlert as Alert } from "@/utils/alert";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { router } from "expo-router";
+import { Feather } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
+import { useFonts } from 'expo-font';
+import BottomNavigation from "@/components/navigation/BottomNavigation";
+import { ThemedText } from "@/components/themed-text";
+import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
+import { profileApi, BASE_URL } from "@/utils/api";
+import AuthModal from "@/components/ui/AuthModal";
 
-const { width: SW } = Dimensions.get('window');
+const { width: SW, height: SH } = Dimensions.get("window");
 
 // ─── Theme (same as profile.tsx / settings.tsx) ───────────────────────────────
-const DARK  = '#0B0B0D';
-const CARD  = '#17171C';
-const CARD2 = '#1A1A24';
-const WHITE = '#FFFFFF';
-const MUTED = '#8E8E95';
-const PINK  = '#FF4D8D';
+const DARK = "#0B0B0D";
+const CARD = "#17171C";
+const CARD2 = "#1A1A24";
+const WHITE = "#FFFFFF";
+const MUTED = "#8E8E95";
+const PINK = "#FF4D8D";
 
 // ─── Static data ──────────────────────────────────────────────────────────────
 
 const steps = [
-  { number: '01', emoji: '📝', en: 'Create Profile',   mr: 'प्रोफाइल तयार करा', descEn: 'Fill in your details, family background and expectations.', descMr: 'आपली माहिती, कौटुंबिक पार्श्वभूमी आणि अपेक्षा भरा.' },
-  { number: '02', emoji: '🔍', en: 'Discover Matches', mr: 'जोडीदार शोधा',       descEn: 'Browse verified profiles from the VVS community.',          descMr: 'VVS समुदायातील सत्यापित प्रोफाइल पाहा.' },
-  { number: '03', emoji: '💬', en: 'Connect & Talk',   mr: 'संपर्क साधा',        descEn: 'Send interest and start a meaningful conversation.',         descMr: 'स्वारस्य पाठवा आणि अर्थपूर्ण संवाद सुरू करा.' },
-  { number: '04', emoji: '💍', en: 'Solemnize',        mr: 'विवाह सोहळा',        descEn: 'Meet families and complete your sacred union.',              descMr: 'कुटुंबाला भेटा आणि आपला पवित्र विवाह पूर्ण करा.' },
+  {
+    number: "01",
+    emoji: "📝",
+    en: "Create Profile",
+    mr: "प्रोफाइल तयार करा",
+    descEn: "Fill in your details, family background and expectations.",
+    descMr: "आपली माहिती, कौटुंबिक पार्श्वभूमी आणि अपेक्षा भरा.",
+  },
+  {
+    number: "02",
+    emoji: "🔍",
+    en: "Discover Matches",
+    mr: "जोडीदार शोधा",
+    descEn: "Browse verified profiles from the VVS community.",
+    descMr: "VVS समुदायातील सत्यापित प्रोफाइल पाहा.",
+  },
+  {
+    number: "03",
+    emoji: "💬",
+    en: "Connect & Talk",
+    mr: "संपर्क साधा",
+    descEn: "Send interest and start a meaningful conversation.",
+    descMr: "स्वारस्य पाठवा आणि अर्थपूर्ण संवाद सुरू करा.",
+  },
+  {
+    number: "04",
+    emoji: "💍",
+    en: "Solemnize",
+    mr: "विवाह सोहळा",
+    descEn: "Meet families and complete your sacred union.",
+    descMr: "कुटुंबाला भेटा आणि आपला पवित्र विवाह पूर्ण करा.",
+  },
 ];
 
 const events = [
-  { emoji: '🪔', dateMr: '15 जून 2025',    dateEn: '15 Jun 2025', titleMr: 'VVS मेळावा — पुणे',  titleEn: 'VVS Gathering — Pune',   descMr: 'वार्षिक विवाह परिचय सोहळा',    descEn: 'Annual matrimonial introduction event',       tagMr: 'आगामी',       tagEn: 'Upcoming',    color: '#F5A623' },
-  { emoji: '🌸', dateMr: '22 जुलै 2025',   dateEn: '22 Jul 2025', titleMr: 'VVS मेळावा — नाशिक', titleEn: 'VVS Gathering — Nashik', descMr: 'समुदाय विवाह परिचय कार्यक्रम', descEn: 'Community matrimonial introduction program', tagMr: 'नोंदणी सुरू', tagEn: 'Registering', color: '#4CD964' },
-  { emoji: '🎊', dateMr: '10 ऑगस्ट 2025', dateEn: '10 Aug 2025', titleMr: 'VVS मेळावा — मुंबई', titleEn: 'VVS Gathering — Mumbai', descMr: 'विशेष विवाह परिचय सत्र',        descEn: 'Special matrimonial introduction session',   tagMr: 'लवकरच',       tagEn: 'Coming Soon', color: '#5AC8FA' },
+  {
+    emoji: "🪔",
+    dateMr: "15 जून 2025",
+    dateEn: "15 Jun 2025",
+    titleMr: "VVS मेळावा — पुणे",
+    titleEn: "VVS Gathering — Pune",
+    descMr: "वार्षिक विवाह परिचय सोहळा",
+    descEn: "Annual matrimonial introduction event",
+    tagMr: "आगामी",
+    tagEn: "Upcoming",
+    color: "#F5A623",
+  },
+  {
+    emoji: "🌸",
+    dateMr: "22 जुलै 2025",
+    dateEn: "22 Jul 2025",
+    titleMr: "VVS मेळावा — नाशिक",
+    titleEn: "VVS Gathering — Nashik",
+    descMr: "समुदाय विवाह परिचय कार्यक्रम",
+    descEn: "Community matrimonial introduction program",
+    tagMr: "नोंदणी सुरू",
+    tagEn: "Registering",
+    color: "#4CD964",
+  },
+  {
+    emoji: "🎊",
+    dateMr: "10 ऑगस्ट 2025",
+    dateEn: "10 Aug 2025",
+    titleMr: "VVS मेळावा — मुंबई",
+    titleEn: "VVS Gathering — Mumbai",
+    descMr: "विशेष विवाह परिचय सत्र",
+    descEn: "Special matrimonial introduction session",
+    tagMr: "लवकरच",
+    tagEn: "Coming Soon",
+    color: "#5AC8FA",
+  },
 ];
 
-const testimonials = [
-  { coupleMr: 'राहुल & प्रिया', coupleEn: 'Rahul & Priya', cityMr: 'पुणे',   quoteMr: 'VVS मुळे आम्हाला योग्य जोडीदार मिळाला. हे व्यासपीठ आमच्यासाठी वरदान ठरले!', quoteEn: 'VVS helped us find the perfect match. This platform was a blessing for us!',       married: 'Married • March 2024', avatar: 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?q=80&w=400&auto=format&fit=crop' },
-  { coupleMr: 'अमित & सोनाली', coupleEn: 'Amit & Sonali', cityMr: 'नाशिक', quoteMr: 'समाजाच्या बंधनात राहून योग्य निर्णय घेता आला. VVS ला धन्यवाद!',               quoteEn: 'We could make the right decision within our community. Thank you VVS!',           married: 'Married • July 2024',  avatar: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?q=80&w=400&auto=format&fit=crop' },
+export const testimonials = [
+  {
+    coupleMr: "राहुल & प्रिया",
+    coupleEn: "Rahul & Priya",
+    cityMr: "पुणे",
+    quoteMr: "VVS मुळे आम्हाला योग्य जोडीदार मिळाला. हे व्यासपीठ आमच्यासाठी वरदान ठरले!",
+    quoteEn: "VVS helped us find the perfect match. This platform was a blessing for us!",
+    married: "Married • March 2024",
+    avatar: "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?q=80&w=400&auto=format&fit=crop",
+  },
+  {
+    coupleMr: "अमित & सोनाली",
+    coupleEn: "Amit & Sonali",
+    cityMr: "नाशिक",
+    quoteMr: "समाजाच्या बंधनात राहून योग्य निर्णय घेता आला. VVS ला धन्यवाद!",
+    quoteEn: "We could make the right decision within our community. Thank you VVS!",
+    married: "Married • July 2024",
+    avatar: "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?q=80&w=400&auto=format&fit=crop",
+  },
+  {
+    coupleMr: "सचिन & अंजली",
+    coupleEn: "Sachin & Anjali",
+    cityMr: "मुंबई",
+    quoteMr: "VVS ने आमच्या दोघांचे विचार आणि कुटुंब जुळवून आणले. आम्ही अत्यंत आनंदी आहोत!",
+    quoteEn: "VVS aligned our thoughts and families beautifully. We are extremely happy!",
+    married: "Married • October 2024",
+    avatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=400&auto=format&fit=crop",
+  },
+  {
+    coupleMr: "विक्रम & स्नेहा",
+    coupleEn: "Vikram & Sneha",
+    cityMr: "कोल्हापूर",
+    quoteMr: "विश्वासार्ह आणि सोपी पद्धत. आम्हा दोघांच्या आवडी-निवडी अगदी तंतोतंत जुळल्या.",
+    quoteEn: "Trustworthy and simple approach. Our hobbies matched perfectly.",
+    married: "Married • December 2024",
+    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400&auto=format&fit=crop",
+  },
+  {
+    coupleMr: "महेश & पूजा",
+    coupleEn: "Mahesh & Pooja",
+    cityMr: "नागपूर",
+    quoteMr: "फक्त काही दिवसांतच मला माझी सहचारिणी मिळाली. उत्कृष्ट सेवा आणि अनुभव!",
+    quoteEn: "Found my life partner within just a few days. Excellent service and support!",
+    married: "Married • January 2025",
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400&auto=format&fit=crop",
+  },
+  {
+    coupleMr: "रोहन & ज्योती",
+    coupleEn: "Rohan & Jyoti",
+    cityMr: "ठाणे",
+    quoteMr: "आमच्या लग्नाचा प्रवास VVS मुळे सोपा आणि सुंदर झाला. आम्ही कायम ऋणी राहू.",
+    quoteEn: "Our wedding journey was made easy and beautiful by VVS. Forever grateful.",
+    married: "Married • April 2025",
+    avatar: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=400&auto=format&fit=crop",
+  },
+  {
+    coupleMr: "अनीश & प्राची",
+    coupleEn: "Anish & Prachi",
+    cityMr: "संभाजीनगर",
+    quoteMr: "पारंपारिक मूल्यांची जपणूक करत आधुनिक पद्धतीने जोडीदार शोधण्याचे उत्तम व्यासपीठ.",
+    quoteEn: "A perfect platform to find a life partner preserving traditional values.",
+    married: "Married • June 2025",
+    avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=400&auto=format&fit=crop",
+  },
 ];
 
 // ─── Sub-components (receive isMr so they re-render on language change) ────────
 
-function SectionHeading({ mr, en, isMr }: { mr: string; en: string; isMr: boolean }) {
+function SectionHeading({
+  mr,
+  en,
+  isMr,
+}: {
+  mr: string;
+  en: string;
+  isMr: boolean;
+}) {
   return (
     <View style={styles.sectionHeading}>
       <ThemedText style={styles.sectionTitle}>{isMr ? mr : en}</ThemedText>
@@ -75,10 +208,18 @@ function CollapsibleHeading({
   onPress: () => void;
 }) {
   return (
-    <TouchableOpacity style={styles.collapsibleHeading} onPress={onPress} activeOpacity={0.85}>
+    <TouchableOpacity
+      style={styles.collapsibleHeading}
+      onPress={onPress}
+      activeOpacity={0.85}
+    >
       <ThemedText style={styles.sectionTitle}>{isMr ? mr : en}</ThemedText>
       <View style={styles.chevronWrap}>
-        <Feather name={expanded ? 'chevron-down' : 'chevron-right'} size={18} color={WHITE} />
+        <Feather
+          name={expanded ? "chevron-down" : "chevron-right"}
+          size={18}
+          color={WHITE}
+        />
       </View>
     </TouchableOpacity>
   );
@@ -90,25 +231,29 @@ function AboutSection({ isMr }: { isMr: boolean }) {
       <View style={styles.aboutIconRow}>
         <ThemedText style={styles.aboutIcon}>🦚</ThemedText>
         <View style={styles.pill}>
-          <ThemedText style={styles.pillText}>{isMr ? 'पिढ्यानपिढ्या' : 'Since generations'}</ThemedText>
+          <ThemedText style={styles.pillText}>
+            {isMr ? "पिढ्यानपिढ्या" : "Since generations"}
+          </ThemedText>
         </View>
       </View>
       <ThemedText style={styles.aboutTitle}>वासुदेव विवाह सोहळा</ThemedText>
       <ThemedText style={styles.aboutSub}>VVS Community</ThemedText>
       <ThemedText style={styles.aboutBody}>
         {isMr
-          ? 'वासुदेव विवाह सोहळा (VVS) ही एक विशेष समाजसेवी संस्था आहे जी वासुदेव समाजातील तरुण-तरुणींसाठी योग्य जीवनसाथी शोधण्यास मदत करते. आमचे उद्दिष्ट म्हणजे परंपरा जपत आधुनिक पद्धतीने विवाह जुळवणे.'
-          : 'VVS is a dedicated platform exclusively for the Vasudev community, helping young individuals find the right life partner while honoring cultural traditions and values.'}
+          ? "वासुदेव विवाह सोहळा (VVS) ही एक विशेष समाजसेवी संस्था आहे जी वासुदेव समाजातील तरुण-तरुणींसाठी योग्य जीवनसाथी शोधण्यास मदत करते. आमचे उद्दिष्ट म्हणजे परंपरा जपत आधुनिक पद्धतीने विवाह जुळवणे."
+          : "VVS is a dedicated platform exclusively for the Vasudev community, helping young individuals find the right life partner while honoring cultural traditions and values."}
       </ThemedText>
       <View style={styles.aboutStats}>
         {[
-          { n: '12K+', labelMr: 'प्रोफाइल', labelEn: 'Profiles' },
-          { n: '850+', labelMr: 'विवाह',    labelEn: 'Marriages' },
-          { n: '48+',  labelMr: 'शहरे',     labelEn: 'Cities' },
+          { n: "12K+", labelMr: "प्रोफाइल", labelEn: "Profiles" },
+          { n: "850+", labelMr: "विवाह", labelEn: "Marriages" },
+          { n: "48+", labelMr: "शहरे", labelEn: "Cities" },
         ].map((s) => (
           <View key={s.n} style={styles.aboutStat}>
             <ThemedText style={styles.aboutStatNum}>{s.n}</ThemedText>
-            <ThemedText style={styles.aboutStatLbl}>{isMr ? s.labelMr : s.labelEn}</ThemedText>
+            <ThemedText style={styles.aboutStatLbl}>
+              {isMr ? s.labelMr : s.labelEn}
+            </ThemedText>
           </View>
         ))}
       </View>
@@ -130,9 +275,13 @@ function HowItWorksSection({ isMr }: { isMr: boolean }) {
           <View style={[styles.card, styles.stepCard]}>
             <View style={styles.stepEmojiRow}>
               <ThemedText style={styles.stepEmoji}>{s.emoji}</ThemedText>
-              <ThemedText style={styles.stepTitle}>{isMr ? s.mr : s.en}</ThemedText>
+              <ThemedText style={styles.stepTitle}>
+                {isMr ? s.mr : s.en}
+              </ThemedText>
             </View>
-            <ThemedText style={styles.stepDesc}>{isMr ? s.descMr : s.descEn}</ThemedText>
+            <ThemedText style={styles.stepDesc}>
+              {isMr ? s.descMr : s.descEn}
+            </ThemedText>
           </View>
         </View>
       ))}
@@ -142,20 +291,42 @@ function HowItWorksSection({ isMr }: { isMr: boolean }) {
 
 function EventsSection({ isMr }: { isMr: boolean }) {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hScroll}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.hScroll}
+    >
       {events.map((e, i) => (
         <View key={i} style={[styles.card, styles.eventCard]}>
           <View style={styles.eventTagRow}>
-            <View style={[styles.eventTag, { backgroundColor: e.color + '22', borderColor: e.color + '55' }]}>
-              <ThemedText style={[styles.eventTagText, { color: e.color }]}>{isMr ? e.tagMr : e.tagEn}</ThemedText>
+            <View
+              style={[
+                styles.eventTag,
+                {
+                  backgroundColor: e.color + "22",
+                  borderColor: e.color + "55",
+                },
+              ]}
+            >
+              <ThemedText style={[styles.eventTagText, { color: e.color }]}>
+                {isMr ? e.tagMr : e.tagEn}
+              </ThemedText>
             </View>
             <ThemedText style={styles.eventEmoji}>{e.emoji}</ThemedText>
           </View>
-          <ThemedText style={styles.eventDate}>{isMr ? e.dateMr : e.dateEn}</ThemedText>
-          <ThemedText style={styles.eventTitle}>{isMr ? e.titleMr : e.titleEn}</ThemedText>
-          <ThemedText style={styles.eventDesc}>{isMr ? e.descMr : e.descEn}</ThemedText>
+          <ThemedText style={styles.eventDate}>
+            {isMr ? e.dateMr : e.dateEn}
+          </ThemedText>
+          <ThemedText style={styles.eventTitle}>
+            {isMr ? e.titleMr : e.titleEn}
+          </ThemedText>
+          <ThemedText style={styles.eventDesc}>
+            {isMr ? e.descMr : e.descEn}
+          </ThemedText>
           <TouchableOpacity style={styles.pinkBtn}>
-            <ThemedText style={styles.pinkBtnText}>{isMr ? 'नोंदणी करा' : 'Register'}</ThemedText>
+            <ThemedText style={styles.pinkBtnText}>
+              {isMr ? "नोंदणी करा" : "Register"}
+            </ThemedText>
           </TouchableOpacity>
         </View>
       ))}
@@ -165,26 +336,57 @@ function EventsSection({ isMr }: { isMr: boolean }) {
 
 function TestimonialsSection({ isMr }: { isMr: boolean }) {
   return (
-    <View style={{ gap: 16 }}>
-      {testimonials.map((t, i) => (
-        <View key={i} style={styles.card}>
+    <ScrollView 
+      horizontal 
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ paddingRight: 20, gap: 16 }}
+    >
+      {testimonials.slice(0, 6).map((t, i) => (
+        <View key={i} style={styles.testimonialHorizontalCard}>
           <View style={styles.testimonialTop}>
             <View>
-              <ImageBackground source={{ uri: t.avatar }} style={styles.testimonialAvatar} imageStyle={{ borderRadius: 30 }} />
+              <ImageBackground
+                source={{ uri: t.avatar }}
+                style={styles.testimonialAvatar}
+                imageStyle={{ borderRadius: 30 }}
+              />
               <View style={styles.heartBadge}>
                 <ThemedText style={{ fontSize: 11 }}>💍</ThemedText>
               </View>
             </View>
             <View style={styles.testimonialMeta}>
-              <ThemedText style={styles.testimonialCouple}>{isMr ? t.coupleMr : t.coupleEn}</ThemedText>
-              <ThemedText style={styles.testimonialCity}>📍 {t.cityMr}</ThemedText>
-              <ThemedText style={styles.testimonialMarried}>{t.married}</ThemedText>
+              <ThemedText style={styles.testimonialCouple}>
+                {isMr ? t.coupleMr : t.coupleEn}
+              </ThemedText>
+              <ThemedText style={styles.testimonialCity}>
+                📍 {t.cityMr}
+              </ThemedText>
+              <ThemedText style={styles.testimonialMarried}>
+                {t.married}
+              </ThemedText>
             </View>
           </View>
-          <ThemedText style={styles.testimonialQuote}>"{isMr ? t.quoteMr : t.quoteEn}"</ThemedText>
+          <View style={{ flex: 1, justifyContent: 'center', marginTop: 10 }}>
+            <ThemedText style={styles.testimonialQuote} numberOfLines={4}>
+              "{isMr ? t.quoteMr : t.quoteEn}"
+            </ThemedText>
+          </View>
         </View>
       ))}
-    </View>
+
+      {/* 7th item: Explore All button card */}
+      <TouchableOpacity 
+        style={styles.exploreMoreStoriesCard} 
+        onPress={() => router.push("/success-stories")}
+      >
+        <View style={styles.exploreCirclePink}>
+          <Feather name="arrow-right" size={24} color="#FF4D8D" />
+        </View>
+        <ThemedText style={styles.exploreTextLabel}>
+          {isMr ? "सर्व यशोगाथा पहा" : "Explore All Stories"}
+        </ThemedText>
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
 
@@ -193,7 +395,11 @@ function TestimonialsSection({ isMr }: { isMr: boolean }) {
 export default function HomeScreen() {
   const { language } = useLanguage();
   const { isAuthenticated, profileCompleted, user } = useAuth();
-  const isMr = language === 'mr';
+  const isMr = language === "mr";
+  const [fontsLoaded] = useFonts({
+    GrandHotel: require('@/assets/fonts/GrandHotel-Regular.ttf'),
+    YatraOne: require('@/assets/fonts/YatraOne-Regular.ttf'),
+  });
   const scrollY = useRef(new Animated.Value(0)).current;
   const [aboutOpen, setAboutOpen] = useState(false);
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
@@ -211,33 +417,89 @@ export default function HomeScreen() {
   };
 
   const getPhotoUrl = (path?: string | null): string => {
-    if (!path) return 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=1200&auto=format&fit=crop';
-    if (path.startsWith('http')) return path;
-    const baseUrl = BASE_URL.replace('/api', '');
-    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    if (!path)
+      return "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=1200&auto=format&fit=crop";
+    if (path.startsWith("http")) return path;
+    const baseUrl = BASE_URL.replace("/api", "");
+    const cleanPath = path.startsWith("/") ? path : `/${path}`;
     return `${baseUrl}${cleanPath}`;
   };
 
   useEffect(() => {
     fetchMatches();
-  }, []);
+  }, [isAuthenticated, profileCompleted]);
 
   const fetchMatches = async () => {
     try {
-      console.log('[Home] Loading real matches from backend...');
-      const response = await profileApi.getAllProfiles(1, 10);
+      console.log("[Home] Loading real matches from backend...");
+      const usePublic = !isAuthenticated || !profileCompleted;
+      const response = usePublic 
+        ? await profileApi.getPublicProfiles(1, 10)
+        : await profileApi.getPartnerPreferenceProfiles(1, 10);
       if (response.data) {
         setRealMatches(response.data);
       }
     } catch (err: any) {
-      console.log('[Home] Failed to load matches:', err.message);
+      console.log("[Home] Failed to load matches:", err.message);
+    }
+  };
+
+  const [uploadingGalleryPhoto, setUploadingGalleryPhoto] = useState(false);
+
+  const handleUploadGalleryPhoto = async () => {
+    try {
+      const permissionResult =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert(
+          "Permission Denied",
+          "Camera roll access is required to upload photos.",
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const photoUri = result.assets[0].uri;
+        console.log("[Home] Uploading gallery photo:", photoUri);
+        setUploadingGalleryPhoto(true);
+
+        const response = await profileApi.uploadPhoto(photoUri);
+        if (response.data) {
+          Alert.alert(
+            "Success",
+            "Photo uploaded to your gallery successfully!",
+          );
+        } else {
+          Alert.alert(
+            "Upload Failed",
+            response.message || "Failed to upload photo.",
+          );
+        }
+      }
+    } catch (err: any) {
+      console.error("[GalleryUpload] Selection/upload failed:", err);
+      Alert.alert("Error", err.message || "Failed to upload gallery photo.");
+    } finally {
+      setUploadingGalleryPhoto(false);
     }
   };
 
   const heroOpacity = scrollY.interpolate({
     inputRange: [0, 300],
     outputRange: [1, 0.3],
-    extrapolate: 'clamp',
+    extrapolate: "clamp",
+  });
+
+  const navbarTranslateY = scrollY.interpolate({
+    inputRange: [0, 80],
+    outputRange: [0, -120],
+    extrapolate: "clamp",
   });
 
   const handlePrimaryAction = () => {
@@ -246,9 +508,9 @@ export default function HomeScreen() {
       return;
     }
     if (profileCompleted) {
-      router.push('/explore');
+      router.push("/explore");
     } else {
-      router.push('/edit-profile');
+      router.push("/edit-profile");
     }
   };
 
@@ -257,151 +519,245 @@ export default function HomeScreen() {
       setShowAuthModal(true);
       return;
     }
-    router.push('/explore');
+    router.push("/explore");
   };
 
   const primaryLabel = profileCompleted
-    ? (isMr ? 'शोधा' : 'Explore Profiles')
-    : (isMr ? 'प्रोफाइल पूर्ण करा' : 'Complete Profile');
+    ? isMr
+      ? "शोधा"
+      : "Explore Profiles"
+    : isMr
+      ? "प्रोफाइल तयार करा"
+      : "Create Profile";
+
+  if (!fontsLoaded) {
+    return null;
+  }
 
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" />
+
+      {/* Fixed Top Navigation Header */}
+      <Animated.View
+        style={[
+          styles.topHeader,
+          { transform: [{ translateY: navbarTranslateY }] },
+        ]}
+      >
+        <SafeAreaView edges={["top"]}>
+          <View style={styles.topHeaderContent}>
+            {/* Left: Brand name */}
+            <ThemedText style={[styles.headerCursiveTitle, { fontSize: isMr ? 21 : 32, fontFamily: isMr ? "YatraOne" : "GrandHotel" }]}>
+              {isMr ? "वासुदेव विवाह सोहळा" : "Vasudev Vivah Sohala"}
+            </ThemedText>
+
+            {/* Right Corner: Bell notification icon */}
+            <TouchableOpacity
+              style={styles.notifBtn}
+              onPress={() => router.push("/requests")}
+            >
+              <Feather
+                name="bell"
+                size={20}
+                color={WHITE}
+              />
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Animated.View>
 
       <Animated.ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: true }
+          { useNativeDriver: true },
         )}
-        scrollEventThrottle={16}>
-
+        scrollEventThrottle={16}
+      >
         {/* ── Hero ── */}
         <Animated.View style={{ opacity: heroOpacity }}>
           <ImageBackground
-            source={{ uri: 'https://imgs.search.brave.com/5N3BuKcZGSaIBczY-iE6H99tw2tlKBNtmkfw69VoK4I/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly9pLnBp/bmltZy5jb20vb3Jp/Z2luYWxzLzg2L2Fm/LzkyLzg2YWY5MjNi/YTEwMjZkNGJjOWE0/OGRmNDc1YmM1OGUw/LmpwZw' }}
+            source={{
+              uri: "https://imgs.search.brave.com/5N3BuKcZGSaIBczY-iE6H99tw2tlKBNtmkfw69VoK4I/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly9pLnBp/bmltZy5jb20vb3Jp/Z2luYWxzLzg2L2Fm/LzkyLzg2YWY5MjNi/YTEwMjZkNGJjOWE0/OGRmNDc1YmM1OGUw/LmpwZw",
+            }}
             style={styles.hero}
-            imageStyle={styles.heroImg}>
-            <SafeAreaView style={styles.heroOverlay}>
-              <View style={styles.heroBadge}>
-                <ThemedText style={styles.heroBadgeText}>
-                  🦚 {isMr ? 'वासुदेव विवाह सोहळा' : 'Vasudev Vivah Sohala'}
-                </ThemedText>
-              </View>
+            imageStyle={styles.heroImg}
+            resizeMode="cover"
+          >
+            <View style={styles.heroOverlay}>
               <View style={styles.heroContent}>
                 <ThemedText style={styles.heroTitle}>
-                  {isMr ? 'योग्य जोडीदार\nआपल्याच समाजात' : 'Find Your Perfect Match\nWithin Our Community'}
+                  {isMr
+                    ? "योग्य जोडीदार\nआपल्याच समाजात"
+                    : "Find Your Perfect Match\nWithin Our Community"}
                 </ThemedText>
                 <ThemedText style={styles.heroSub}>
-                  {isMr ? 'फक्त वासुदेव समाजासाठी' : 'Exclusively for the Vasudev community'}
+                  {isMr
+                    ? "फक्त वासुदेव समाजासाठी"
+                    : "Exclusively for the Vasudev community"}
                 </ThemedText>
                 <View style={styles.heroBtnRow}>
                   {!profileCompleted ? (
                     <>
-                      <TouchableOpacity style={styles.heroPrimary} onPress={handlePrimaryAction}>
+                      <TouchableOpacity
+                        style={styles.heroPrimary}
+                        onPress={handlePrimaryAction}
+                      >
                         <ThemedText style={styles.heroPrimaryText}>
                           {primaryLabel}
                         </ThemedText>
                       </TouchableOpacity>
-                      <TouchableOpacity style={styles.heroSecondary} onPress={handleExploreAction}>
+                      <TouchableOpacity
+                        style={styles.heroSecondary}
+                        onPress={handleExploreAction}
+                      >
                         <ThemedText style={styles.heroSecondaryText}>
-                          {isMr ? 'शोधा' : 'Explore'}
+                          {isMr ? "शोधा" : "Explore"}
                         </ThemedText>
                       </TouchableOpacity>
                     </>
                   ) : (
-                    <TouchableOpacity style={styles.heroPrimary} onPress={handleExploreAction}>
-                      <ThemedText style={styles.heroPrimaryText}>
-                        {isMr ? 'शोधा' : 'Explore Profiles'}
+                    <TouchableOpacity
+                      style={styles.heroSecondary}
+                      onPress={handleExploreAction}
+                    >
+                      <ThemedText style={styles.heroSecondaryText}>
+                        {isMr ? "शोधा" : "Explore Profiles"}
                       </ThemedText>
                     </TouchableOpacity>
                   )}
                 </View>
               </View>
-            </SafeAreaView>
+            </View>
           </ImageBackground>
         </Animated.View>
 
         {/* ── Trending Matches ── */}
         <View style={styles.section}>
           <SectionHeading mr="आजचे जोडीदार" en="Latest Profiles" isMr={isMr} />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hScroll}>
-            {realMatches.filter((profile) => {
-              if (!isAuthenticated || !user || !user.profile) return true;
-              const lookingFor = (user.profile.lookingFor || '').toLowerCase();
-              const gender = (profile.gender || '').toLowerCase();
-              if (lookingFor === 'bride' || lookingFor === 'female') {
-                return gender === 'female';
-              }
-              if (lookingFor === 'groom' || lookingFor === 'male') {
-                return gender === 'male';
-              }
-              return true;
-            }).map((profile) => {
-              const age = getAge(profile.dateOfBirth);
-              const imageUrl = getPhotoUrl(profile.profilePhoto);
-              const locationStr = [profile.city, profile.state, profile.country].filter(Boolean).join(', ') || 'Not set';
-
-              const handleConnect = () => {
-                if (!isAuthenticated) {
-                  setShowAuthModal(true);
-                  return;
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.hScroll}
+          >
+            {realMatches
+              .filter((profile) => {
+                if (!isAuthenticated || !user || !user.profile) return true;
+                const lookingFor = (
+                  user.profile.lookingFor || ""
+                ).toLowerCase();
+                const gender = (profile.gender || "").toLowerCase();
+                if (lookingFor === "bride" || lookingFor === "female") {
+                  return gender === "female";
                 }
-                Alert.alert('Connect', `Sending connection request to ${profile.fullName}...`);
-              };
-
-              const handleCardPress = () => {
-                if (!isAuthenticated) {
-                  setShowAuthModal(true);
-                  return;
+                if (lookingFor === "groom" || lookingFor === "male") {
+                  return gender === "male";
                 }
-                router.push({
-                  pathname: '/profile',
-                  params: {
-                    view: 'other',
-                    profileId: String(profile.id),
-                    name: profile.fullName,
-                    age: String(age),
-                    role: profile.profession || 'Not set',
-                    gender: (profile.gender || 'male').toLowerCase(),
-                    bio: profile.bio || '',
-                    about: profile.bio || '',
-                    education: profile.education || '--',
-                    city: profile.city || '',
-                    state: profile.state || '',
-                    country: profile.country || '',
-                    height: profile.height || '--',
-                    interest: (profile.interest || []).join(','),
-                    image: imageUrl,
-                    isConnection: 'false',
-                  },
-                });
-              };
+                return true;
+              })
+              .slice(0, 6)
+              .map((profile) => {
+                const age = getAge(profile.dateOfBirth);
+                const imageUrl = getPhotoUrl(profile.profilePhoto);
+                const locationStr =
+                  [profile.city, profile.state, profile.country]
+                    .filter(Boolean)
+                    .join(", ") || "Not set";
 
-              return (
-                <TouchableOpacity
-                  key={profile.id}
-                  activeOpacity={0.9}
-                  onPress={handleCardPress}
-                  style={[styles.card, styles.profileCard]}
-                >
-                  <ImageBackground
-                    source={{ uri: imageUrl }}
-                    style={styles.profileImg}
-                    imageStyle={styles.profileImgStyle}>
-                    <View style={styles.activePill}>
-                      <View style={styles.activeDot} />
-                      <ThemedText style={styles.activeText}>{isMr ? 'सक्रिय' : 'Active'}</ThemedText>
+                const handleConnect = () => {
+                  if (!isAuthenticated) {
+                    setShowAuthModal(true);
+                    return;
+                  }
+                  if (!profileCompleted) {
+                    Alert.alert(
+                      isMr ? 'प्रोफाइल अपूर्ण आहे' : 'Profile Incomplete',
+                      isMr ? 'कृपया प्रथम तुमची प्रोफाइल तयार करा.' : 'Please create your profile first.'
+                    );
+                    router.push('/edit-profile');
+                    return;
+                  }
+                  Alert.alert(
+                    "Connect",
+                    `Sending connection request to ${profile.fullName}...`,
+                  );
+                };
+
+                const handleCardPress = () => {
+                  if (!isAuthenticated) {
+                    setShowAuthModal(true);
+                    return;
+                  }
+                  if (!profileCompleted) {
+                    Alert.alert(
+                      isMr ? 'प्रोफाइल अपूर्ण आहे' : 'Profile Incomplete',
+                      isMr ? 'कृपया प्रथम तुमची प्रोफाइल तयार करा.' : 'Please create your profile first.'
+                    );
+                    router.push('/edit-profile');
+                    return;
+                  }
+                  router.push({
+                    pathname: "/profile",
+                    params: {
+                      view: "other",
+                      profileId: String(profile.id),
+                      name: profile.fullName,
+                      age: String(age),
+                      role: profile.profession || "Not set",
+                      gender: (profile.gender || "male").toLowerCase(),
+                      bio: profile.bio || "",
+                      about: profile.bio || "",
+                      education: profile.education || "--",
+                      city: profile.city || "",
+                      state: profile.state || "",
+                      country: profile.country || "",
+                      height: profile.height || "--",
+                      interest: (profile.interest || []).join(","),
+                      image: imageUrl,
+                      isConnection: "false",
+                    },
+                  });
+                };
+
+                return (
+                  <TouchableOpacity
+                    key={profile.id}
+                    activeOpacity={0.9}
+                    onPress={handleCardPress}
+                    style={[styles.card, styles.profileCard]}
+                  >
+                    <ImageBackground
+                      source={{ uri: imageUrl }}
+                      style={styles.profileImg}
+                      imageStyle={styles.profileImgStyle}
+                    />
+                    <View style={styles.profileBody}>
+                      <ThemedText style={styles.profileName}>
+                        {profile.fullName}
+                      </ThemedText>
+                      <ThemedText style={styles.profileRole}>
+                        {profile.profession || "Not set"}
+                      </ThemedText>
                     </View>
-                  </ImageBackground>
-                  <View style={styles.profileBody}>
-                    <ThemedText style={styles.profileName}>{profile.fullName}</ThemedText>
-                    <ThemedText style={styles.profileRole}>{profile.profession || 'Not set'}</ThemedText>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
+                  </TouchableOpacity>
+                );
+              })}
+
+            {/* Explore All Profiles Card */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => router.push("/explore")}
+              style={[styles.card, styles.profileCard, styles.exploreProfilesCard]}
+            >
+              <View style={styles.exploreCirclePink}>
+                <Feather name="arrow-right" size={24} color="#FF4D8D" />
+              </View>
+              <ThemedText style={styles.exploreTextLabel}>
+                {isMr ? "सर्व प्रोफाईल पहा" : "Explore All Profiles"}
+              </ThemedText>
+            </TouchableOpacity>
           </ScrollView>
         </View>
 
@@ -415,18 +771,25 @@ export default function HomeScreen() {
         <View style={styles.ctaBanner}>
           <ThemedText style={styles.ctaEmoji}>🦚</ThemedText>
           <ThemedText style={styles.ctaTitle}>
-            {isMr ? 'आजच सुरुवात करा' : 'Start Your Journey Today'}
+            {isMr ? "आजच सुरुवात करा" : "Start Your Journey Today"}
           </ThemedText>
           <ThemedText style={styles.ctaSub}>
             {isMr
-              ? 'हजारो वासुदेव समाजातील सदस्यांसोबत सामील व्हा.'
-              : 'Join thousands from the Vasudev community finding their soulmate.'}
+              ? "हजारो वासुदेव समाजातील सदस्यांसोबत सामील व्हा."
+              : "Join thousands from the Vasudev community finding their soulmate."}
           </ThemedText>
-          <TouchableOpacity style={[styles.pinkBtn, styles.ctaBtn]} onPress={handlePrimaryAction}>
+          <TouchableOpacity
+            style={[styles.pinkBtn, styles.ctaBtn]}
+            onPress={handlePrimaryAction}
+          >
             <ThemedText style={styles.pinkBtnText}>
               {profileCompleted
-                ? (isMr ? 'प्रोफाइलला भेट द्या' : 'Visit Profile')
-                : (isMr ? 'प्रोफाइल तयार करा' : 'Create Profile')}
+                ? isMr
+                  ? "प्रोफाइलला भेट द्या"
+                  : "Visit Profile"
+                : isMr
+                  ? "प्रोफाइल तयार करा"
+                  : "Create Profile"}
             </ThemedText>
           </TouchableOpacity>
         </View>
@@ -485,11 +848,13 @@ export default function HomeScreen() {
           <ThemedText style={styles.footerCompany}>DHRUVEXA</ThemedText>
           <ThemedText style={styles.footerText}>TECHNOLOGIES</ThemedText>
         </View>
-
       </Animated.ScrollView>
 
       <BottomNavigation />
-      <AuthModal visible={showAuthModal} onClose={() => setShowAuthModal(false)} />
+      <AuthModal
+        visible={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+      />
     </View>
   );
 }
@@ -500,49 +865,95 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: DARK },
   scrollContent: { paddingBottom: 80 },
 
+  // Top Header Bar
+  topHeader: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "rgba(255, 77, 141, 0.15)",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255, 77, 141, 0.22)",
+    zIndex: 1000,
+  },
+  topHeaderContent: {
+    height: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 18,
+  },
+  centerHeaderContainer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: -1,
+  },
+  headerCursiveTitle: {
+    color: WHITE,
+    textAlign: "center",
+  },
+  notifBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 77, 141, 0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 77, 141, 0.35)",
+  },
+  headerIndicator: {
+    padding: 8,
+  },
+
   // Hero
-  hero: { height: 680 },
-  heroImg: { borderBottomLeftRadius: 36, borderBottomRightRadius: 36 },
+  hero: { width: SW, height: SH },
+  heroImg: { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
   heroOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(5,5,10,0.62)',
+    backgroundColor: "rgba(5,5,10,0.62)",
     paddingHorizontal: 22,
   },
   heroBadge: {
     marginTop: 12,
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,77,141,0.15)',
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(255,77,141,0.15)",
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: PINK + '55',
+    borderColor: PINK + "55",
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  heroBadgeText: { color: PINK, fontWeight: '700', fontSize: 13 },
-  heroContent: { flex: 1, justifyContent: 'center' },
-  heroTitle: { color: WHITE, fontSize: 36, fontWeight: '900', lineHeight: 46 },
-  heroSub: { color: '#B0B0BE', marginTop: 12, fontSize: 13, lineHeight: 20 },
-  heroBtnRow: { flexDirection: 'row', gap: 12, marginTop: 28 },
+  heroBadgeText: { color: PINK, fontWeight: "700", fontSize: 13 },
+  heroContent: { flex: 1, justifyContent: "center" },
+  heroTitle: { color: WHITE, fontSize: 36, fontWeight: "900", lineHeight: 46 },
+  heroSub: { color: "#B0B0BE", marginTop: 12, fontSize: 13, lineHeight: 20 },
+  heroBtnRow: { flexDirection: "row", gap: 12, marginTop: 28 },
   heroPrimary: {
     backgroundColor: PINK,
     paddingHorizontal: 24,
     paddingVertical: 14,
     borderRadius: 16,
   },
-  heroPrimaryText: { color: WHITE, fontWeight: '800', fontSize: 15 },
+  heroPrimaryText: { color: WHITE, fontWeight: "800", fontSize: 15 },
   heroSecondary: {
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderColor: "rgba(255,255,255,0.22)",
+    backgroundColor: "rgba(255,255,255,0.08)",
     paddingHorizontal: 24,
     paddingVertical: 14,
     borderRadius: 16,
   },
-  heroSecondaryText: { color: WHITE, fontWeight: '600', fontSize: 15 },
+  heroSecondaryText: { color: WHITE, fontWeight: "600", fontSize: 15 },
 
   // Stats
   statsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 10,
     marginHorizontal: 18,
     marginTop: -38,
@@ -552,34 +963,40 @@ const styles = StyleSheet.create({
     backgroundColor: CARD,
     borderRadius: 20,
     paddingVertical: 18,
-    alignItems: 'center',
+    alignItems: "center",
   },
-  statNum: { color: PINK, fontSize: 22, fontWeight: '800' },
+  statNum: { color: PINK, fontSize: 22, fontWeight: "800" },
   statLbl: { color: MUTED, fontSize: 11, marginTop: 4 },
 
   // Section
   section: { marginTop: 36, paddingHorizontal: 18 },
   sectionHeading: { marginBottom: 18 },
-  sectionTitle: { color: WHITE, fontSize: 22, fontWeight: '900' },
-  sectionLine: { width: 40, height: 3, backgroundColor: PINK, borderRadius: 99, marginTop: 8 },
+  sectionTitle: { color: WHITE, fontSize: 22, fontWeight: "900" },
+  sectionLine: {
+    width: 40,
+    height: 3,
+    backgroundColor: PINK,
+    borderRadius: 99,
+    marginTop: 8,
+  },
   collapsibleHeading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     backgroundColor: CARD,
     borderRadius: 20,
     paddingHorizontal: 18,
     paddingVertical: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: "rgba(255,255,255,0.06)",
   },
   chevronWrap: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
   },
   collapsibleBody: {
     marginTop: 14,
@@ -589,108 +1006,164 @@ const styles = StyleSheet.create({
   card: { backgroundColor: CARD, borderRadius: 24, padding: 20 },
 
   // About
-  aboutIconRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
+  aboutIconRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 14,
+  },
   aboutIcon: { fontSize: 36 },
   pill: {
-    backgroundColor: PINK + '22',
+    backgroundColor: PINK + "22",
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderWidth: 1,
-    borderColor: PINK + '44',
+    borderColor: PINK + "44",
   },
-  pillText: { color: PINK, fontSize: 11, fontWeight: '700' },
-  aboutTitle: { color: WHITE, fontSize: 22, fontWeight: '900' },
-  aboutSub: { color: PINK, fontSize: 13, fontWeight: '700', marginTop: 2, marginBottom: 12 },
-  aboutBody: { color: '#C8C8D8', fontSize: 14, lineHeight: 22 },
+  pillText: { color: PINK, fontSize: 11, fontWeight: "700" },
+  aboutTitle: { color: WHITE, fontSize: 22, fontWeight: "900" },
+  aboutSub: {
+    color: PINK,
+    fontSize: 13,
+    fontWeight: "700",
+    marginTop: 2,
+    marginBottom: 12,
+  },
+  aboutBody: { color: "#C8C8D8", fontSize: 14, lineHeight: 22 },
   aboutStats: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginTop: 20,
     paddingTop: 18,
     borderTopWidth: 1,
-    borderTopColor: '#FFFFFF11',
-    justifyContent: 'space-around',
+    borderTopColor: "#FFFFFF11",
+    justifyContent: "space-around",
   },
-  aboutStat: { alignItems: 'center' },
-  aboutStatNum: { color: WHITE, fontSize: 24, fontWeight: '900' },
-  aboutStatLbl: { color: MUTED, fontSize: 11, marginTop: 4, textAlign: 'center' },
+  aboutStat: { alignItems: "center" },
+  aboutStatNum: { color: WHITE, fontSize: 24, fontWeight: "900" },
+  aboutStatLbl: {
+    color: MUTED,
+    fontSize: 11,
+    marginTop: 4,
+    textAlign: "center",
+  },
 
   // Matches
   hScroll: { gap: 16, paddingBottom: 4 },
-  profileCard: { width: SW * 0.68, padding: 0, overflow: 'hidden' },
-  profileImg: { height: 300, justifyContent: 'flex-end', padding: 14 },
+  profileCard: { width: SW * 0.68, padding: 0, overflow: "hidden" },
+  profileImg: { height: 300, justifyContent: "flex-end", padding: 14 },
   profileImgStyle: { borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   activePill: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.55)",
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
     gap: 6,
   },
-  activeDot: { width: 8, height: 8, borderRadius: 99, backgroundColor: '#3BFF87' },
+  activeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 99,
+    backgroundColor: "#3BFF87",
+  },
   activeText: { color: WHITE, fontSize: 11 },
   profileBody: { padding: 18 },
-  profileName: { color: WHITE, fontSize: 20, fontWeight: '800' },
-  profileRole: { color: '#C0C0CC', marginTop: 4, fontSize: 13 },
+  profileName: { color: WHITE, fontSize: 20, fontWeight: "800" },
+  profileRole: { color: "#C0C0CC", marginTop: 4, fontSize: 13 },
   profileCity: { color: MUTED, marginTop: 3, fontSize: 12, marginBottom: 14 },
 
   // Shared pink button
-  pinkBtn: { backgroundColor: PINK, paddingVertical: 12, borderRadius: 14, alignItems: 'center' },
-  pinkBtnText: { color: WHITE, fontWeight: '800', fontSize: 13 },
+  pinkBtn: {
+    backgroundColor: PINK,
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: "center",
+  },
+  pinkBtnText: { color: WHITE, fontWeight: "800", fontSize: 13 },
 
   // Steps
-  stepRow: { flexDirection: 'row', gap: 14, minHeight: 120 },
-  stepLeft: { alignItems: 'center', width: 44 },
+  stepRow: { flexDirection: "row", gap: 14, minHeight: 120 },
+  stepLeft: { alignItems: "center", width: 44 },
   stepNumBox: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: PINK + '22',
+    backgroundColor: PINK + "22",
     borderWidth: 1.5,
     borderColor: PINK,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
-  stepNum: { color: PINK, fontWeight: '900', fontSize: 13 },
-  stepConnector: { flex: 1, width: 1.5, backgroundColor: PINK + '33', marginVertical: 4 },
+  stepNum: { color: PINK, fontWeight: "900", fontSize: 13 },
+  stepConnector: {
+    flex: 1,
+    width: 1.5,
+    backgroundColor: PINK + "33",
+    marginVertical: 4,
+  },
   stepCard: { flex: 1, borderRadius: 20, marginBottom: 14, padding: 16 },
-  stepEmojiRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 },
+  stepEmojiRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 8,
+  },
   stepEmoji: { fontSize: 26 },
-  stepTitle: { color: WHITE, fontWeight: '800', fontSize: 15 },
-  stepDesc: { color: '#C0C0CC', fontSize: 13, lineHeight: 19, marginTop: 4 },
+  stepTitle: { color: WHITE, fontWeight: "800", fontSize: 15 },
+  stepDesc: { color: "#C0C0CC", fontSize: 13, lineHeight: 19, marginTop: 4 },
 
   // Events
   eventCard: { width: SW * 0.78 },
-  eventTagRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  eventTag: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
-  eventTagText: { fontSize: 11, fontWeight: '700' },
+  eventTagRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  eventTag: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  eventTagText: { fontSize: 11, fontWeight: "700" },
   eventEmoji: { fontSize: 28 },
   eventDate: { color: MUTED, fontSize: 12, marginBottom: 6 },
-  eventTitle: { color: WHITE, fontSize: 18, fontWeight: '900' },
-  eventDesc: { color: '#C0C0CC', fontSize: 13, marginTop: 6, lineHeight: 19 },
+  eventTitle: { color: WHITE, fontSize: 18, fontWeight: "900" },
+  eventDesc: { color: "#C0C0CC", fontSize: 13, marginTop: 6, lineHeight: 19 },
 
   // Testimonials
-  testimonialTop: { flexDirection: 'row', gap: 14, marginBottom: 14 },
+  testimonialTop: { flexDirection: "row", gap: 14, marginBottom: 14 },
   testimonialAvatar: { width: 60, height: 60, borderRadius: 30 },
   heartBadge: {
-    position: 'absolute',
+    position: "absolute",
     bottom: -4,
     right: -4,
     backgroundColor: CARD2,
     borderRadius: 99,
     width: 22,
     height: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
-  testimonialMeta: { flex: 1, justifyContent: 'center' },
-  testimonialCouple: { color: WHITE, fontSize: 16, fontWeight: '800' },
+  testimonialMeta: { flex: 1, justifyContent: "center" },
+  testimonialCouple: { color: WHITE, fontSize: 16, fontWeight: "800" },
   testimonialCity: { color: PINK, fontSize: 12, marginTop: 3 },
-  testimonialMarried: { color: '#3BFF87', fontSize: 11, marginTop: 3, fontWeight: '600' },
-  testimonialQuote: { color: '#D0D0DC', fontSize: 14, lineHeight: 22, fontStyle: 'italic' },
+  testimonialMarried: {
+    color: "#3BFF87",
+    fontSize: 11,
+    marginTop: 3,
+    fontWeight: "600",
+  },
+  testimonialQuote: {
+    color: "#D0D0DC",
+    fontSize: 14,
+    lineHeight: 22,
+    fontStyle: "italic",
+  },
 
   // CTA
   ctaBanner: {
@@ -699,42 +1172,107 @@ const styles = StyleSheet.create({
     backgroundColor: CARD,
     borderRadius: 28,
     padding: 28,
-    alignItems: 'center',
+    alignItems: "center",
   },
   ctaEmoji: { fontSize: 44, marginBottom: 12 },
-  ctaTitle: { color: WHITE, fontSize: 26, fontWeight: '900', textAlign: 'center' },
-  ctaSub: { color: MUTED, fontSize: 13, marginTop: 10, textAlign: 'center', lineHeight: 20 },
-  ctaBtn: { marginTop: 20, paddingHorizontal: 28, paddingVertical: 15, borderRadius: 18 },
+  ctaTitle: {
+    color: WHITE,
+    fontSize: 26,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  ctaSub: {
+    color: MUTED,
+    fontSize: 13,
+    marginTop: 10,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  ctaBtn: {
+    marginTop: 20,
+    paddingHorizontal: 28,
+    paddingVertical: 15,
+    borderRadius: 18,
+  },
 
   // Footer
   footer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 18,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.06)',
+    borderTopColor: "rgba(255,255,255,0.06)",
     marginTop: 30,
-    backgroundColor: '#0A0A0E',
+    backgroundColor: "#0A0A0E",
   },
   footerLabel: {
-    color: '#77777C',
+    color: "#77777C",
     fontSize: 12,
     letterSpacing: 2,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   footerCompany: {
-    color: '#FF4D8D',
+    color: "#FF4D8D",
     fontSize: 20,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: 4,
     marginTop: 4,
   },
   footerText: {
-    color: '#B0B0BE',
+    color: "#B0B0BE",
     fontSize: 11,
     letterSpacing: 6,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
     marginTop: 2,
     marginLeft: 6,
+  },
+  exploreProfilesCard: {
+    width: SW * 0.68,
+    height: 380,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: CARD,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: "rgba(255, 77, 141, 0.2)",
+    gap: 12,
+  },
+  exploreCirclePink: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "rgba(255, 77, 141, 0.12)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: "rgba(255, 77, 141, 0.35)",
+  },
+  exploreTextLabel: {
+    color: "#FF4D8D",
+    fontSize: 16,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  testimonialHorizontalCard: {
+    width: SW * 0.8,
+    height: 240,
+    backgroundColor: CARD,
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    justifyContent: "space-between",
+  },
+  exploreMoreStoriesCard: {
+    width: 180,
+    height: 240,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: CARD,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: "rgba(255, 77, 141, 0.2)",
+    padding: 20,
+    gap: 12,
   },
 });

@@ -5,10 +5,10 @@ import {
   StyleSheet,
   TouchableOpacity,
   View,
-  Alert,
   Modal,
   ActivityIndicator,
 } from 'react-native';
+import { CustomAlert as Alert } from '@/utils/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -27,11 +27,32 @@ export default function SettingsScreen() {
   const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
 
+  const [showConfirmDeactivateModal, setShowConfirmDeactivateModal] = useState(false);
+  const [deactivatingAccount, setDeactivatingAccount] = useState(false);
+
+  const confirmDeactivateAccount = async () => {
+    try {
+      setDeactivatingAccount(true);
+      console.log('[Account] Deactivating user account...');
+      const response = await profileApi.deletedOrDeactivateProfile('deactive');
+      if (response.message) {
+        setShowConfirmDeactivateModal(false);
+        Alert.alert('Deactivated', 'Your account has been deactivated successfully.');
+        await logout();
+      }
+    } catch (err: any) {
+      console.log('[Account] Failed to deactivate account:', err);
+      Alert.alert('Error', err.message || 'Failed to deactivate account.');
+    } finally {
+      setDeactivatingAccount(false);
+    }
+  };
+
   const confirmDeleteAccount = async () => {
     try {
       setDeletingAccount(true);
       console.log('[Account] Deleting user account...');
-      const response = await profileApi.deleteAccount();
+      const response = await profileApi.deletedOrDeactivateProfile('delete');
       if (response.message) {
         setShowConfirmDeleteModal(false);
         Alert.alert('Deleted', 'Your account has been deleted.');
@@ -147,6 +168,16 @@ export default function SettingsScreen() {
                   <ThemedText style={styles.subSettingText}>{t('changePassword')}</ThemedText>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color="#555" />
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.subSettingItem} 
+                onPress={() => setShowConfirmDeactivateModal(true)}>
+                <View style={styles.settingLeft}>
+                  <Ionicons name="pause-circle-outline" size={16} color="#FF9F1C" />
+                  <ThemedText style={[styles.subSettingText, { color: '#FF9F1C', fontWeight: 'bold' }]}>Deactivate Account</ThemedText>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color="#FF9F1C" />
               </TouchableOpacity>
 
               <TouchableOpacity 
@@ -270,6 +301,48 @@ export default function SettingsScreen() {
                 If you have any questions about this Privacy Policy or wish to request data deletion, please contact us at support@vvsmatrimony.org.
               </ThemedText>
 
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* DEACTIVATE ACCOUNT CONFIRMATION MODAL */}
+      <Modal visible={showConfirmDeactivateModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.confirmDeleteModalContent}>
+            <View style={styles.confirmDeleteHeader}>
+              <Ionicons name="pause-circle-outline" size={32} color="#FF9F1C" />
+              <ThemedText style={[styles.confirmDeleteTitle, { color: '#FF9F1C' }]}>Deactivate Your Account?</ThemedText>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.confirmDeleteBody} showsVerticalScrollIndicator={false}>
+              <ThemedText style={styles.confirmDeleteWarningIntro}>
+                Deactivating your account will hide your profile from all other members. You can re-activate your account anytime by logging back in.
+              </ThemedText>
+
+              <ThemedText style={styles.confirmDeleteConfirmationPrompt}>
+                Are you sure you want to deactivate your account?
+              </ThemedText>
+
+              <View style={styles.confirmDeleteActions}>
+                <TouchableOpacity 
+                  style={[styles.confirmDeleteBtnFinal, { backgroundColor: '#FF9F1C' }]} 
+                  onPress={confirmDeactivateAccount}
+                  disabled={deactivatingAccount}>
+                  {deactivatingAccount ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <ThemedText style={styles.confirmDeleteBtnFinalText}>Yes, Deactivate My Account</ThemedText>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.cancelDeleteBtn} 
+                  onPress={() => setShowConfirmDeactivateModal(false)}
+                  disabled={deactivatingAccount}>
+                  <ThemedText style={styles.cancelDeleteBtnText}>Cancel & Keep Active</ThemedText>
+                </TouchableOpacity>
+              </View>
             </ScrollView>
           </View>
         </View>

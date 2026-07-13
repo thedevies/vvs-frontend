@@ -1,5 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { ActivityIndicator, FlatList, Image, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View, Alert, Modal, TextInput } from 'react-native';
+import { ActivityIndicator, FlatList, Image, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View, Modal, TextInput } from 'react-native';
+import { CustomAlert as Alert } from '@/utils/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect, useCallback } from 'react';
@@ -10,7 +11,7 @@ import BottomNavigation from '@/components/navigation/BottomNavigation';
 import { ThemedText } from '@/components/themed-text';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
-import { profileApi, BASE_URL } from '@/utils/api';
+import { profileApi, interestApi, BASE_URL } from '@/utils/api';
 import type { UserPhoto } from '@/utils/types';
 
 export default function ProfileScreen() {
@@ -38,6 +39,7 @@ export default function ProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [photos, setPhotos] = useState<UserPhoto[]>([]);
   const [loadingPhotos, setLoadingPhotos] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 
   // Other profile dynamic load states
   const [otherUser, setOtherUser] = useState<any>(null);
@@ -74,6 +76,14 @@ export default function ProfileScreen() {
         setOtherUser(response.data);
         if (response.data.photos) {
           setPhotos(response.data.photos);
+        }
+        const data = response.data as any;
+        if (data.interestStatus === 'PENDING' && data.isInterestSender) {
+          setConnectionRequested(true);
+        } else if (data.interestStatus === 'ACCEPTED') {
+          setConnectionRequested(true);
+        } else {
+          setConnectionRequested(false);
         }
       }
     } catch (err) {
@@ -193,32 +203,96 @@ export default function ProfileScreen() {
     await WebBrowser.openBrowserAsync(fullUrl);
   };
 
-  const handleDeleteBiodata = () => {
+  const handleUpdateBiodata = () => {
     Alert.alert(
-      'Delete Biodata',
-      'Are you sure you want to permanently delete your matrimonial biodata PDF?',
+      'Update Biodata',
+      'Choose how you want to update your matrimonial biodata PDF:',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              console.log('[Biodata] Deleting biodata...');
-              const response = await profileApi.deleteBiodata();
-              if (response.message) {
-                Alert.alert('Deleted', 'Biodata PDF deleted successfully.');
-                await refreshUser();
-              }
-            } catch (err: any) {
-              console.log('[Biodata] Failed to delete biodata:', err);
-              Alert.alert('Error', err.message || 'Failed to delete biodata.');
-            }
-          },
+          text: 'Upload New PDF',
+          onPress: () => handleUploadBiodata(),
+        },
+        {
+          text: 'Generate New PDF',
+          onPress: () => setShowGenerateModal(true),
         },
       ]
     );
   };
+
+  const handleConnectPress = async () => {
+    if (!isOtherProfileView || !otherUser) return;
+    
+    const otherData = otherUser as any;
+    const targetUserId = otherUser.id || otherData.userId || otherData.id;
+    
+    // 1. If interestStatus is PENDING and we are the sender -> cancel it
+    if (otherData.interestStatus === 'PENDING' && otherData.isInterestSender && otherData.interestId) {
+      try {
+        const res = await interestApi.cancelInterest(otherData.interestId);
+        Alert.alert('Cancelled', 'Connection request cancelled.');
+        await loadOtherProfile(targetUserId);
+      } catch (err: any) {
+        Alert.alert('Error', err.message || 'Failed to cancel request.');
+      }
+      return;
+    }
+    
+    // 2. If interestStatus is PENDING and we are NOT the sender -> accept it
+    if (otherData.interestStatus === 'PENDING' && !otherData.isInterestSender && otherData.interestId) {
+      try {
+        const res = await interestApi.acceptInterest(otherData.interestId);
+        Alert.alert('Accepted', `You are now connected with ${otherUser.profile?.fullName || 'this user'}!`);
+        await loadOtherProfile(targetUserId);
+      } catch (err: any) {
+        Alert.alert('Error', err.message || 'Failed to accept request.');
+      }
+      return;
+    }
+
+    // 3. Otherwise, send a new interest request
+    try {
+      const res = await interestApi.sendInterest(targetUserId);
+      Alert.alert('Sent', 'Connection request sent successfully.');
+      await loadOtherProfile(targetUserId);
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to send request.');
+    }
+  };
+
+  const buttonConfig = (() => {
+    if (!isOtherProfileView || !otherUser) {
+      return { label: 'Send Connection Request', icon: 'heart' as const, style: {}, disabled: false };
+    }
+    const otherData = otherUser as any;
+    if (otherData.interestStatus === 'ACCEPTED') {
+      return {
+        label: 'Connected',
+        icon: 'checkmark-circle' as const,
+        style: { backgroundColor: '#3B8C58' },
+        disabled: true
+      };
+    }
+    if (otherData.interestStatus === 'PENDING') {
+      if (otherData.isInterestSender) {
+        return {
+          label: 'Cancel Request',
+          icon: 'close-circle-outline' as const,
+          style: { backgroundColor: '#383840' },
+          disabled: false
+        };
+      } else {
+        return {
+          label: 'Accept Request',
+          icon: 'checkmark-circle-outline' as const,
+          style: { backgroundColor: '#1E6AD2' },
+          disabled: false
+        };
+      }
+    }
+    return { label: 'Send Connection Request', icon: 'heart' as const, style: {}, disabled: false };
+  })();
 
   // ---- Own profile data from context ----
   const profile = user?.profile;
@@ -318,9 +392,14 @@ export default function ProfileScreen() {
   const [connectionRequested, setConnectionRequested] = useState(false);
 
   // Photo data for grid
-  const photoUrls = isOtherProfileView
-    ? (displayImage ? [displayImage] : [])
-    : photos.map((p) => getPhotoUrl(p.photoUrl));
+  // Photo data for grid (filter out profile photo from gallery view)
+  const profilePhotoPath = isOtherProfileView 
+    ? otherUser?.profile?.profilePhoto 
+    : user?.profile?.profilePhoto;
+
+  const photoUrls = photos
+    .filter((p) => p.photoUrl !== profilePhotoPath)
+    .map((p) => getPhotoUrl(p.photoUrl));
 
   return (
     <View style={styles.mainContainer}>
@@ -360,7 +439,7 @@ export default function ProfileScreen() {
                 <ThemedText style={styles.profileProfessionText}>{displayRole}</ThemedText>
                 
                 <View style={styles.ageBadge}>
-                  <ThemedText style={styles.ageBadgeText}>Age {displayAge} • {lookingForGender === 'Female' ? 'Looking for Female' : 'Looking for Male'}</ThemedText>
+                  <ThemedText style={styles.ageBadgeText}>Age {displayAge}</ThemedText>
                 </View>
               </View>
             </View>
@@ -385,14 +464,14 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 style={[
                   styles.miniRequestButton, 
-                  connectionRequested && styles.miniRequestedButton,
+                  buttonConfig.style,
                   matchScore === null && { flex: 1 } // Full width if no match score
                 ]}
-                onPress={() => setConnectionRequested(true)}
-                disabled={connectionRequested}>
-                <Ionicons name={connectionRequested ? 'checkmark-circle' : 'heart'} size={18} color="#fff" />
+                onPress={handleConnectPress}
+                disabled={buttonConfig.disabled}>
+                <Ionicons name={buttonConfig.icon} size={18} color="#fff" />
                 <ThemedText style={styles.miniRequestButtonText}>
-                  {connectionRequested ? 'Requested' : 'Send Connection Request'}
+                  {buttonConfig.label}
                 </ThemedText>
               </TouchableOpacity>
             </View>
@@ -502,8 +581,8 @@ export default function ProfileScreen() {
                     <Ionicons name="eye-outline" size={16} color="#fff" />
                   </TouchableOpacity>
                   {!isOtherProfileView && (
-                    <TouchableOpacity style={[styles.biodataRoundBtn, { backgroundColor: 'rgba(255, 77, 77, 0.1)' }]} onPress={handleDeleteBiodata}>
-                      <Ionicons name="trash-outline" size={16} color="#ff4d4d" />
+                    <TouchableOpacity style={[styles.biodataRoundBtn, { backgroundColor: 'rgba(255, 77, 141, 0.1)' }]} onPress={handleUpdateBiodata}>
+                      <Ionicons name="cloud-upload-outline" size={16} color="#FF4D8D" />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -549,7 +628,7 @@ export default function ProfileScreen() {
                 keyExtractor={(_, i) => i.toString()}
                 columnWrapperStyle={styles.columnWrapper}
                 renderItem={({ item }) => (
-                  <TouchableOpacity style={styles.postContainer}>
+                  <TouchableOpacity style={styles.postContainer} onPress={() => setSelectedPhoto(item)}>
                     <Image source={{ uri: item }} style={styles.postImage} />
                   </TouchableOpacity>
                 )}
@@ -637,6 +716,24 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </ScrollView>
           </View>
+        </View>
+      </Modal>
+
+      {/* Full Photo Preview Modal */}
+      <Modal visible={!!selectedPhoto} transparent animationType="fade">
+        <View style={styles.previewOverlay}>
+          <TouchableOpacity 
+            style={styles.previewCloseBtn} 
+            onPress={() => setSelectedPhoto(null)}>
+            <Ionicons name="close" size={28} color="#fff" />
+          </TouchableOpacity>
+          {selectedPhoto && (
+            <Image 
+              source={{ uri: selectedPhoto }} 
+              style={styles.previewFullImage} 
+              resizeMode="contain" 
+            />
+          )}
         </View>
       </Modal>
 
@@ -1079,5 +1176,22 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '700',
+  },
+  previewOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.94)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewCloseBtn: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    padding: 10,
+  },
+  previewFullImage: {
+    width: '90%',
+    height: '80%',
   },
 });

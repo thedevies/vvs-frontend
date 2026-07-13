@@ -6,6 +6,8 @@ import { useColorScheme } from 'react-native';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { LanguageProvider } from '@/context/LanguageContext';
 
+import CustomAlertRenderer from '@/components/ui/CustomAlertRenderer';
+
 function RootLayoutNav() {
   const { isAuthenticated, isLoading, profileCompleted } = useAuth();
   const segments = useSegments();
@@ -17,7 +19,7 @@ function RootLayoutNav() {
     const inAuthGroup = segs[0] === '(auth)';
     const isRoot = segs.length === 0 || 
                    (segs.length === 1 && (segs[0] === '(app)' || segs[0] === 'index')) || 
-                   (segs.length === 2 && segs[0] === '(app)' && segs[1] === 'index');
+                   (segs.length === 2 && segs[0] === '(app)' && (segs[1] === 'index' || segs[1] === 'explore'));
 
     if (!isAuthenticated && !inAuthGroup && !isRoot) {
       router.replace('/(auth)/welcome');
@@ -44,6 +46,7 @@ function RootLayoutNav() {
         <Stack.Screen name="(app)"  options={{ headerShown: false }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       </Stack>
+      <CustomAlertRenderer />
     </ThemeProvider>
   );
 }

@@ -44,6 +44,7 @@ export default function WelcomeScreen() {
         uri: "https://imgs.search.brave.com/Fd0NF4oH9SjDYO_Ooo1QUzLEugWEG4Q9PSz98pn5T-Y/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly9pLnBp/bmltZy5jb20vb3Jp/Z2luYWxzLzJiLzBk/LzE2LzJiMGQxNjVm/NzQ2NmM5OWY5Mjhj/NWU3OWI5YjMyMDlm/LmpwZw",
       }}
       style={styles.background}
+      resizeMode="cover"
     >
       <View style={styles.overlay}>
         <SafeAreaView style={{ flex: 1 }}>

@@ -238,6 +238,23 @@ export const profileApi = {
       body: JSON.stringify(data),
     }),
 
+  uploadProfilePhoto: async (photoUri: string) => {
+    const formData = new FormData();
+    const filename = photoUri.split('/').pop() || 'photo.jpg';
+    const match = /\.([\w]+)$/.exec(filename);
+    const type = match ? `image/${match[1]}` : 'image/jpeg';
+    formData.append('photo', {
+      uri: photoUri,
+      name: filename,
+      type,
+    } as any);
+
+    return request<ApiResponse<{ photoUrl: string }>>('/profile/upload-profile-photo', {
+      method: 'POST',
+      body: formData,
+    });
+  },
+
   uploadPhoto: async (photoUri: string) => {
     const formData = new FormData();
     const filename = photoUri.split('/').pop() || 'photo.jpg';
@@ -292,15 +309,49 @@ export const profileApi = {
       body: JSON.stringify(data),
     }),
 
-  deleteBiodata: () =>
-    request<ApiResponse>('/profile/biodata', {
-      method: 'DELETE',
+
+
+  getPartnerPreferenceProfiles: (page: number, limit: number) =>
+    request<ApiResponse<UserProfile[]>>(`/profile/getPartnerPreferenceProfiles?page=${page}&limit=${limit}`),
+
+  getPublicProfiles: (page: number, limit: number) =>
+    request<ApiResponse<UserProfile[]>>(`/profile/public/list?page=${page}&limit=${limit}`, {}, false),
+
+  deletedOrDeactivateProfile: (flag: 'deactive' | 'delete') =>
+    request<ApiResponse>(`/profile/deletedOrDeactivateProfile?flag=${flag}`, {
+      method: 'GET',
     }),
 
   deleteAccount: () =>
     request<ApiResponse>('/profile/account', {
       method: 'DELETE',
     }),
+};
+
+// ─── Interest API ─────────────────────────────────────────────────────────────
+
+export const interestApi = {
+  sendInterest: (receiverId: number) =>
+    request<{ message: string; data: { interestId: number; status: string } }>('/interest/send', {
+      method: 'POST',
+      body: JSON.stringify({ receiverId }),
+    }),
+
+  acceptInterest: (interestId: number) =>
+    request<{ message: string; data: any }>(`/interest/accept/${interestId}`, {
+      method: 'PATCH',
+    }),
+
+  cancelInterest: (interestId: number) =>
+    request<{ message: string; data: any }>(`/interest/cancel/${interestId}`, {
+      method: 'PATCH',
+    }),
+
+  getReceivedInterests: (page: number, limit: number, search?: string) => {
+    let url = `/interest/received?page=${page}&limit=${limit}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    return request<ApiResponse>(url);
+  },
 };
 
 // Export base URL for debugging

@@ -2,10 +2,13 @@ import { useAuth } from "@/context/AuthContext";
 import { ThemedText } from "@/components/themed-text";
 import { Feather } from "@expo/vector-icons";
 import { router, usePathname } from "expo-router";
-import { StyleSheet, TouchableOpacity, View, Platform, Image } from "react-native";
+import { StyleSheet, TouchableOpacity, View, Platform, Image, ActivityIndicator } from "react-native";
 import { useEffect, useState } from "react";
 import AuthModal from "@/components/ui/AuthModal";
-import { BASE_URL } from "@/utils/api";
+import { BASE_URL, profileApi } from "@/utils/api";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as ImagePicker from "expo-image-picker";
+import { CustomAlert as Alert } from "@/utils/alert";
 
 type BottomNavigationProps = {
   activeRouteOverride?: string;
@@ -16,6 +19,10 @@ export default function BottomNavigation({ activeRouteOverride }: BottomNavigati
   const { isAuthenticated, profileCompleted, user } = useAuth();
   const [showLockedWarning, setShowLockedWarning] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const insets = useSafeAreaInsets();
+
+  const bottomPadding = insets.bottom > 0 ? insets.bottom : 12;
+  const warningBottom = 54 + bottomPadding;
 
   useEffect(() => {
     if (!showLockedWarning) return;
@@ -28,23 +35,49 @@ export default function BottomNavigation({ activeRouteOverride }: BottomNavigati
   }, [showLockedWarning]);
 
   const blockedRoutes = new Set(["/search", "/requests"]);
+  const [uploading, setUploading] = useState(false);
 
-  const handleTabPress = (route: string) => {
+  const handleUploadPhoto = async () => {
     if (!isAuthenticated) {
-      if (route === "/") {
-        router.push(route as any);
-      } else {
-        setShowAuthModal(true);
-      }
+      setShowAuthModal(true);
       return;
     }
-
-    if (!profileCompleted && blockedRoutes.has(route)) {
+    if (!profileCompleted) {
       setShowLockedWarning(true);
       return;
     }
 
-    router.push(route as any);
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert("Permission Denied", "Media library access is required to upload photos.");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const photoUri = result.assets[0].uri;
+        console.log("[BottomNav] Uploading gallery photo:", photoUri);
+        setUploading(true);
+
+        const response = await profileApi.uploadPhoto(photoUri);
+        if (response.data) {
+          Alert.alert("Success", "Photo uploaded to your gallery successfully!");
+        } else {
+          Alert.alert("Upload Failed", response.message || "Failed to upload photo.");
+        }
+      }
+    } catch (err: any) {
+      console.error("[BottomNav] Upload failed:", err);
+      Alert.alert("Error", err.message || "Failed to upload photo.");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const tabs = [
@@ -58,10 +91,17 @@ export default function BottomNavigation({ activeRouteOverride }: BottomNavigati
       label: "Explore",
       route: "/explore",
     },
+    /*
     {
       icon: "search",
       label: "Search",
       route: "/search",
+    },
+    */
+    {
+      icon: "plus",
+      label: "Upload",
+      action: "upload",
     },
     {
       icon: "heart",
@@ -73,7 +113,35 @@ export default function BottomNavigation({ activeRouteOverride }: BottomNavigati
       label: "Profile",
       route: "/profile",
     },
-  ];
+  ] as const;
+
+  const handleTabPress = (tab: typeof tabs[number]) => {
+    if ('action' in tab && tab.action === "upload") {
+      handleUploadPhoto();
+      return;
+    }
+    const route = (tab as any).route;
+    if (!isAuthenticated) {
+      if (route === "/" || route === "/explore") {
+        router.push(route as any);
+      } else {
+        setShowAuthModal(true);
+      }
+      return;
+    }
+
+    if (route === "/profile" && !profileCompleted) {
+      router.push("/edit-profile");
+      return;
+    }
+
+    if (!profileCompleted && blockedRoutes.has(route)) {
+      setShowLockedWarning(true);
+      return;
+    }
+
+    router.push(route as any);
+  };
 
   const getPhotoUrl = (path?: string | null): string => {
     if (!path) return '';
@@ -88,24 +156,24 @@ export default function BottomNavigation({ activeRouteOverride }: BottomNavigati
       <AuthModal visible={showAuthModal} onClose={() => setShowAuthModal(false)} />
 
       {showLockedWarning && (
-        <View style={styles.lockWarning}>
-          <Feather name="lock" size={16} color="#D0D0D5" />
+        <View style={[styles.lockWarning, { bottom: warningBottom }]}>
+          <Feather name="lock" size={16} color="#FF4D8D" />
           <ThemedText style={styles.lockWarningText}>
-            To enable this, complete your profile.
+            To enable this, create your profile.
           </ThemedText>
         </View>
       )}
 
-      <View style={styles.container}>
+      <View style={[styles.container, { paddingBottom: bottomPadding }]}>
       {tabs.map((tab, index) => {
-        const active = (activeRouteOverride ?? pathname) === tab.route;
+        const active = 'route' in tab && (activeRouteOverride ?? pathname) === tab.route;
         const ownPhoto = user?.profile?.profilePhoto;
 
         return (
           <TouchableOpacity
             key={index}
             style={styles.tabButton}
-            onPress={() => handleTabPress(tab.route)}
+            onPress={() => handleTabPress(tab)}
           >
             {tab.icon === "user" && ownPhoto ? (
               <Image
@@ -115,6 +183,8 @@ export default function BottomNavigation({ activeRouteOverride }: BottomNavigati
                   { borderColor: active ? "#FF4D8D" : "rgba(255,255,255,0.18)" }
                 ]}
               />
+            ) : 'action' in tab && tab.action === 'upload' && uploading ? (
+              <ActivityIndicator size="small" color="#FF4D8D" />
             ) : (
               <Feather
                 name={tab.icon as any}
@@ -144,7 +214,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#0F0F12",
 
     paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 26 : 12,
 
     borderTopWidth: 0.5,
     borderTopColor: "rgba(255,255,255,0.08)",
@@ -156,11 +225,10 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 24,
     right: 24,
-    bottom: Platform.OS === 'ios' ? 78 : 58,
     borderRadius: 14,
-    backgroundColor: "#2A2A2F",
+    backgroundColor: "#1A1215",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(255, 77, 141, 0.3)",
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
@@ -170,7 +238,7 @@ const styles = StyleSheet.create({
   },
 
   lockWarningText: {
-    color: "#D0D0D5",
+    color: "#FF4D8D",
     fontSize: 12,
     fontWeight: "600",
   },
