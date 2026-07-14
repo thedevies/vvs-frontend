@@ -111,6 +111,7 @@ export default function EditProfileScreen() {
   const [loading, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [error, setError] = useState('');
+  const [ageError, setAgeError] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Biodata states
@@ -258,28 +259,64 @@ export default function EditProfileScreen() {
 
   const handleSave = async () => {
     setError('');
+    setAgeError('');
 
     // Validation
     if (!name.trim()) {
-      setError('Please enter your full name.');
+      const msg = 'Please enter your full name.';
+      setError(msg);
+      Alert.alert('Validation Error', msg);
       return;
     }
     if (!heightFeet.trim() || !heightInches.trim()) {
-      setError('Please enter your height in feet and inches (e.g. 5 ft 10 in).');
+      const msg = 'Please enter your height in feet and inches (e.g. 5 ft 10 in).';
+      setError(msg);
+      Alert.alert('Validation Error', msg);
       return;
     }
     if (!dateOfBirth.trim()) {
-      setError('Please select your date of birth.');
+      const msg = 'Please select your date of birth.';
+      setError(msg);
+      Alert.alert('Validation Error', msg);
       return;
     }
+
+    // Age validation
+    const dobDate = new Date(dateOfBirth);
+    const today = new Date();
+    let age = today.getFullYear() - dobDate.getFullYear();
+    const monthDiff = today.getMonth() - dobDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dobDate.getDate())) {
+      age--;
+    }
+
+    if (gender === 'female' && age < 18) {
+      const msg = 'Age must be at least 18 years old.';
+      setError(msg);
+      setAgeError(msg);
+      Alert.alert('Validation Error', msg);
+      return;
+    }
+    if (gender === 'male' && age < 21) {
+      const msg = 'Age must be at least 21 years old.';
+      setError(msg);
+      setAgeError(msg);
+      Alert.alert('Validation Error', msg);
+      return;
+    }
+
     if (!bio.trim()) {
-      setError('Please write a short bio about yourself.');
+      const msg = 'Please write a short bio about yourself.';
+      setError(msg);
+      Alert.alert('Validation Error', msg);
       return;
     }
 
     // For new profile, photo is required
     if (!profileCompleted && !photoUri) {
-      setError('Please select a profile photo.');
+      const msg = 'Please select a profile photo.';
+      setError(msg);
+      Alert.alert('Validation Error', msg);
       return;
     }
 
@@ -287,7 +324,9 @@ export default function EditProfileScreen() {
 
     // Biodata is mandatory for all users
     if (!user?.biodata) {
-      setError('Matrimonial biodata is mandatory! Please upload or generate your biodata below before saving.');
+      const msg = 'Matrimonial biodata is mandatory! Please upload or generate your biodata below before saving.';
+      setError(msg);
+      Alert.alert('Validation Error', msg);
       return;
     }
 
@@ -482,6 +521,9 @@ export default function EditProfileScreen() {
                   }}
                 />
               )}
+              {ageError ? (
+                <ThemedText style={styles.fieldError}>{ageError}</ThemedText>
+              ) : null}
             </View>
 
             {/* Marital Status */}
@@ -1207,5 +1249,12 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '700',
+  },
+  fieldError: {
+    color: '#ff4d4d',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 6,
+    paddingLeft: 4,
   },
 });

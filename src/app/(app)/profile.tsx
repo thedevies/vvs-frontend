@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { ActivityIndicator, FlatList, Image, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View, Modal, TextInput } from 'react-native';
+import { ActivityIndicator, FlatList, Image, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View, Modal, TextInput, Dimensions } from 'react-native';
 import { CustomAlert as Alert } from '@/utils/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,16 +7,20 @@ import { useState, useEffect, useCallback } from 'react';
 import * as DocumentPicker from 'expo-document-picker';
 import * as WebBrowser from 'expo-web-browser';
 
+const { width: SW } = Dimensions.get('window');
+
 import BottomNavigation from '@/components/navigation/BottomNavigation';
 import { ThemedText } from '@/components/themed-text';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { profileApi, interestApi, BASE_URL } from '@/utils/api';
 import type { UserPhoto } from '@/utils/types';
+import { eventEmitter } from '@/utils/events';
 
 export default function ProfileScreen() {
   const { user, logout, refreshUser } = useAuth();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
+  const isMr = language === 'mr';
   const params = useLocalSearchParams<{
     view?: string | string[];
     profileId?: string | string[];
@@ -39,7 +43,7 @@ export default function ProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [photos, setPhotos] = useState<UserPhoto[]>([]);
   const [loadingPhotos, setLoadingPhotos] = useState(false);
-  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<UserPhoto | null>(null);
 
   // Other profile dynamic load states
   const [otherUser, setOtherUser] = useState<any>(null);
@@ -67,6 +71,17 @@ export default function ProfileScreen() {
       loadPhotos();
     }
   }, [isOtherProfileView, params.profileId]);
+
+  // Listen to live photo upload events
+  useEffect(() => {
+    if (!isOtherProfileView) {
+      const unsubscribe = eventEmitter.on('photo-uploaded', () => {
+        console.log('[Profile] Photo upload event received, reloading gallery...');
+        loadPhotos();
+      });
+      return () => unsubscribe();
+    }
+  }, [isOtherProfileView]);
 
   const loadOtherProfile = async (id: number) => {
     try {
@@ -105,6 +120,42 @@ export default function ProfileScreen() {
     } finally {
       setLoadingPhotos(false);
     }
+  };
+
+  const handleDeletePhoto = async (photoId: number) => {
+    Alert.alert(
+      isMr ? 'फोटो हटवा' : 'Delete Photo',
+      isMr ? 'तुम्हाला खात्री आहे की तुम्ही हा फोटो हटवू इच्छिता?' : 'Are you sure you want to delete this photo?',
+      [
+        {
+          text: isMr ? 'रद्द करा' : 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: isMr ? 'हटवा' : 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const res = await profileApi.deletePhoto(photoId);
+              if (res.message) {
+                Alert.alert(
+                  isMr ? 'यशस्वी' : 'Success',
+                  isMr ? 'फोटो यशस्वीरित्या हटवला गेला.' : 'Photo deleted successfully!'
+                );
+                // Update local state list
+                setPhotos((prev) => prev.filter((p) => p.id !== photoId));
+                setSelectedPhoto(null);
+              }
+            } catch (err: any) {
+              Alert.alert(
+                isMr ? 'त्रुटी' : 'Error',
+                err.message || (isMr ? 'फोटो हटवण्यात अयशस्वी.' : 'Failed to delete photo.')
+              );
+            }
+          },
+        },
+      ]
+    );
   };
 
   const onRefresh = useCallback(async () => {
@@ -397,9 +448,7 @@ export default function ProfileScreen() {
     ? otherUser?.profile?.profilePhoto 
     : user?.profile?.profilePhoto;
 
-  const photoUrls = photos
-    .filter((p) => p.photoUrl !== profilePhotoPath)
-    .map((p) => getPhotoUrl(p.photoUrl));
+  const galleryPhotos = photos.filter((p) => p.photoUrl !== profilePhotoPath);
 
   return (
     <View style={styles.mainContainer}>
@@ -620,16 +669,16 @@ export default function ProfileScreen() {
             <ThemedText style={styles.postTitle}>{t('photos')}</ThemedText>
             {loadingPhotos && !isOtherProfileView ? (
               <ActivityIndicator color="#FF4D8D" style={{ marginTop: 16 }} />
-            ) : photoUrls.length > 0 ? (
+            ) : galleryPhotos.length > 0 ? (
               <FlatList
-                data={photoUrls}
+                data={galleryPhotos}
                 scrollEnabled={false}
                 numColumns={3}
-                keyExtractor={(_, i) => i.toString()}
+                keyExtractor={(item) => item.id.toString()}
                 columnWrapperStyle={styles.columnWrapper}
                 renderItem={({ item }) => (
                   <TouchableOpacity style={styles.postContainer} onPress={() => setSelectedPhoto(item)}>
-                    <Image source={{ uri: item }} style={styles.postImage} />
+                    <Image source={{ uri: getPhotoUrl(item.photoUrl) }} style={styles.postImage} />
                   </TouchableOpacity>
                 )}
               />
@@ -720,21 +769,71 @@ export default function ProfileScreen() {
       </Modal>
 
       {/* Full Photo Preview Modal */}
-      <Modal visible={!!selectedPhoto} transparent animationType="fade">
-        <View style={styles.previewOverlay}>
-          <TouchableOpacity 
-            style={styles.previewCloseBtn} 
-            onPress={() => setSelectedPhoto(null)}>
-            <Ionicons name="close" size={28} color="#fff" />
-          </TouchableOpacity>
-          {selectedPhoto && (
-            <Image 
-              source={{ uri: selectedPhoto }} 
-              style={styles.previewFullImage} 
-              resizeMode="contain" 
-            />
-          )}
-        </View>
+      <Modal visible={!!selectedPhoto} transparent animationType="slide">
+        <SafeAreaView style={styles.previewContainer} edges={['top', 'bottom']}>
+          {/* Header bar of modal */}
+          <View style={styles.previewHeader}>
+            <TouchableOpacity 
+              style={styles.previewCloseButton} 
+              onPress={() => setSelectedPhoto(null)}
+            >
+              <Ionicons name="arrow-back" size={24} color="#fff" />
+            </TouchableOpacity>
+            <ThemedText style={styles.previewTitle}>
+              {isOtherProfileView ? (isMr ? 'गॅलरी' : 'Gallery') : (isMr ? 'माझी गॅलरी' : 'My Gallery')}
+            </ThemedText>
+            <View style={{ width: 40 }} />
+          </View>
+
+          {/* Vertical scroll list of posts */}
+          <FlatList
+            data={galleryPhotos}
+            keyExtractor={(item) => item.id.toString()}
+            initialScrollIndex={galleryPhotos.indexOf(selectedPhoto!) !== -1 ? galleryPhotos.indexOf(selectedPhoto!) : 0}
+            getItemLayout={(_, index) => ({
+              length: SW + 76,
+              offset: (SW + 76) * index,
+              index,
+            })}
+            renderItem={({ item }) => {
+              const imgUrl = getPhotoUrl(item.photoUrl);
+              return (
+                <View style={styles.instagramPostCard}>
+                  {/* Post Header */}
+                  <View style={styles.instagramPostHeader}>
+                    <View style={styles.instagramPostHeaderLeft}>
+                      <Image 
+                        source={{ uri: displayImage }} 
+                        style={styles.instagramPostAvatar} 
+                      />
+                      <View>
+                        <ThemedText style={styles.instagramPostName}>
+                          {isOtherProfileView ? otherUser?.profile?.fullName : user?.profile?.fullName}
+                        </ThemedText>
+                        <ThemedText style={styles.instagramPostLocation}>
+                          📍 {isOtherProfileView ? otherUser?.profile?.city : user?.profile?.city || 'VVS Member'}
+                        </ThemedText>
+                      </View>
+                    </View>
+                    
+                    {/* Delete button (if own profile) */}
+                    {!isOtherProfileView && (
+                      <TouchableOpacity 
+                        style={styles.postDeleteBtn}
+                        onPress={() => handleDeletePhoto(item.id)}
+                      >
+                        <Ionicons name="trash-outline" size={20} color="#ff5c5c" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  {/* Post Image */}
+                  <Image source={{ uri: imgUrl }} style={styles.instagramPostImage} />
+                </View>
+              );
+            }}
+            showsVerticalScrollIndicator={false}
+          />
+        </SafeAreaView>
       </Modal>
 
       </SafeAreaView>
@@ -979,8 +1078,8 @@ const styles = StyleSheet.create({
   },
   postSection: { marginTop: 28 },
   postTitle: { color: '#fff', fontSize: 20, fontWeight: '700', marginBottom: 16 },
-  columnWrapper: { justifyContent: 'space-between', marginBottom: 8 },
-  postContainer: { width: '32%', aspectRatio: 1, borderRadius: 18, overflow: 'hidden' },
+  columnWrapper: { justifyContent: 'flex-start', gap: 8, marginBottom: 8 },
+  postContainer: { width: (SW - 48) / 3, aspectRatio: 1, borderRadius: 18, overflow: 'hidden' },
   postImage: { width: '100%', height: '100%' },
   noPhotos: {
     backgroundColor: '#17171C',
@@ -1177,21 +1276,71 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
   },
-  previewOverlay: {
+  previewContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.94)',
+    backgroundColor: '#0B0B0D',
+  },
+  previewHeader: {
+    height: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  previewTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  previewCloseButton: {
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  previewCloseBtn: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-    zIndex: 10,
-    padding: 10,
+  instagramPostCard: {
+    width: SW,
+    marginBottom: 20,
   },
-  previewFullImage: {
-    width: '90%',
-    height: '80%',
+  instagramPostHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  instagramPostHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  instagramPostAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#FF4D8D',
+  },
+  instagramPostName: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  instagramPostLocation: {
+    color: '#8E8E95',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  instagramPostImage: {
+    width: SW,
+    height: SW,
+  },
+  postDeleteBtn: {
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

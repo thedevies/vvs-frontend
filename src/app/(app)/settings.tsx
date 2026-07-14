@@ -29,6 +29,7 @@ export default function SettingsScreen() {
 
   const [showConfirmDeactivateModal, setShowConfirmDeactivateModal] = useState(false);
   const [deactivatingAccount, setDeactivatingAccount] = useState(false);
+  const [showDangerZoneModal, setShowDangerZoneModal] = useState(false);
 
   const confirmDeactivateAccount = async () => {
     try {
@@ -171,21 +172,11 @@ export default function SettingsScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity 
-                style={styles.subSettingItem} 
-                onPress={() => setShowConfirmDeactivateModal(true)}>
-                <View style={styles.settingLeft}>
-                  <Ionicons name="pause-circle-outline" size={16} color="#FF9F1C" />
-                  <ThemedText style={[styles.subSettingText, { color: '#FF9F1C', fontWeight: 'bold' }]}>Deactivate Account</ThemedText>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color="#FF9F1C" />
-              </TouchableOpacity>
-
-              <TouchableOpacity 
                 style={[styles.subSettingItem, { borderBottomWidth: 0 }]} 
-                onPress={() => setShowConfirmDeleteModal(true)}>
+                onPress={() => setShowDangerZoneModal(true)}>
                 <View style={styles.settingLeft}>
                   <Ionicons name="warning-outline" size={16} color="#ff4d4d" />
-                  <ThemedText style={[styles.subSettingText, { color: '#ff4d4d', fontWeight: 'bold' }]}>Danger Zone (Delete Account)</ThemedText>
+                  <ThemedText style={[styles.subSettingText, { color: '#ff4d4d', fontWeight: 'bold' }]}>Danger Zone</ThemedText>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color="#ff4d4d" />
               </TouchableOpacity>
@@ -310,6 +301,13 @@ export default function SettingsScreen() {
       <Modal visible={showConfirmDeactivateModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.confirmDeleteModalContent}>
+            <TouchableOpacity 
+              style={styles.modalCloseButton} 
+              onPress={() => setShowConfirmDeactivateModal(false)}
+            >
+              <Ionicons name="close" size={20} color="#fff" />
+            </TouchableOpacity>
+
             <View style={styles.confirmDeleteHeader}>
               <Ionicons name="pause-circle-outline" size={32} color="#FF9F1C" />
               <ThemedText style={[styles.confirmDeleteTitle, { color: '#FF9F1C' }]}>Deactivate Your Account?</ThemedText>
@@ -326,7 +324,7 @@ export default function SettingsScreen() {
 
               <View style={styles.confirmDeleteActions}>
                 <TouchableOpacity 
-                  style={[styles.confirmDeleteBtnFinal, { backgroundColor: '#FF9F1C' }]} 
+                  style={[styles.confirmDeleteBtnFinal, { backgroundColor: '#FF9F1C', marginBottom: 20 }]} 
                   onPress={confirmDeactivateAccount}
                   disabled={deactivatingAccount}>
                   {deactivatingAccount ? (
@@ -334,13 +332,6 @@ export default function SettingsScreen() {
                   ) : (
                     <ThemedText style={styles.confirmDeleteBtnFinalText}>Yes, Deactivate My Account</ThemedText>
                   )}
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                  style={styles.cancelDeleteBtn} 
-                  onPress={() => setShowConfirmDeactivateModal(false)}
-                  disabled={deactivatingAccount}>
-                  <ThemedText style={styles.cancelDeleteBtnText}>Cancel & Keep Active</ThemedText>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -352,6 +343,13 @@ export default function SettingsScreen() {
       <Modal visible={showConfirmDeleteModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.confirmDeleteModalContent}>
+            <TouchableOpacity 
+              style={styles.modalCloseButton} 
+              onPress={() => setShowConfirmDeleteModal(false)}
+            >
+              <Ionicons name="close" size={20} color="#fff" />
+            </TouchableOpacity>
+
             <View style={styles.confirmDeleteHeader}>
               <Ionicons name="warning-outline" size={32} color="#ff4d4d" />
               <ThemedText style={styles.confirmDeleteTitle}>Delete Your Account?</ThemedText>
@@ -387,7 +385,7 @@ export default function SettingsScreen() {
 
               <View style={styles.confirmDeleteActions}>
                 <TouchableOpacity 
-                  style={styles.confirmDeleteBtnFinal} 
+                  style={[styles.confirmDeleteBtnFinal, { marginBottom: 20 }]} 
                   onPress={confirmDeleteAccount}
                   disabled={deletingAccount}>
                   {deletingAccount ? (
@@ -396,15 +394,55 @@ export default function SettingsScreen() {
                     <ThemedText style={styles.confirmDeleteBtnFinalText}>Yes, Delete My Account</ThemedText>
                   )}
                 </TouchableOpacity>
-
-                <TouchableOpacity 
-                  style={styles.cancelDeleteBtn} 
-                  onPress={() => setShowConfirmDeleteModal(false)}
-                  disabled={deletingAccount}>
-                  <ThemedText style={styles.cancelDeleteBtnText}>Cancel & Keep Account</ThemedText>
-                </TouchableOpacity>
               </View>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* DANGER ZONE MODAL */}
+      <Modal visible={showDangerZoneModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.confirmDeleteModalContent}>
+            <TouchableOpacity 
+              style={styles.modalCloseButton} 
+              onPress={() => setShowDangerZoneModal(false)}
+            >
+              <Ionicons name="close" size={20} color="#fff" />
+            </TouchableOpacity>
+
+            <View style={styles.confirmDeleteHeader}>
+              <Ionicons name="warning-outline" size={32} color="#ff4d4d" />
+              <ThemedText style={styles.confirmDeleteTitle}>Danger Zone</ThemedText>
+            </View>
+
+            <View style={styles.confirmDeleteBody}>
+              <ThemedText style={styles.confirmDeleteWarningIntro}>
+                Select an action below to temporarily hide your account or permanently delete your data.
+              </ThemedText>
+
+              <View style={{ gap: 14, marginTop: 20, marginBottom: 24 }}>
+                {/* Deactivate Button */}
+                <TouchableOpacity 
+                  style={[styles.confirmDeleteBtnFinal, { backgroundColor: '#FF9F1C' }]} 
+                  onPress={() => {
+                    setShowDangerZoneModal(false);
+                    setShowConfirmDeactivateModal(true);
+                  }}>
+                  <ThemedText style={styles.confirmDeleteBtnFinalText}>Deactivate Account</ThemedText>
+                </TouchableOpacity>
+
+                {/* Delete Button */}
+                <TouchableOpacity 
+                  style={[styles.confirmDeleteBtnFinal, { backgroundColor: '#ff4d4d' }]} 
+                  onPress={() => {
+                    setShowDangerZoneModal(false);
+                    setShowConfirmDeleteModal(true);
+                  }}>
+                  <ThemedText style={styles.confirmDeleteBtnFinalText}>Delete Account</ThemedText>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         </View>
       </Modal>
@@ -631,6 +669,19 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingHorizontal: 24,
     maxHeight: '90%',
+    position: 'relative',
+  },
+  modalCloseButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
   },
   confirmDeleteHeader: {
     alignItems: 'center',

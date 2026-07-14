@@ -9,6 +9,7 @@ import { BASE_URL, profileApi } from "@/utils/api";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import { CustomAlert as Alert } from "@/utils/alert";
+import { eventEmitter } from "@/utils/events";
 
 type BottomNavigationProps = {
   activeRouteOverride?: string;
@@ -68,6 +69,7 @@ export default function BottomNavigation({ activeRouteOverride }: BottomNavigati
         const response = await profileApi.uploadPhoto(photoUri);
         if (response.data) {
           Alert.alert("Success", "Photo uploaded to your gallery successfully!");
+          eventEmitter.emit("photo-uploaded");
         } else {
           Alert.alert("Upload Failed", response.message || "Failed to upload photo.");
         }

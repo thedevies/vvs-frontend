@@ -275,6 +275,11 @@ export const profileApi = {
   getMyPhotos: () =>
     request<ApiResponse<UserPhoto[]>>('/profile/photos'),
 
+  deletePhoto: (photoId: number) =>
+    request<ApiResponse<any>>(`/profile/deletePhoto/${photoId}`, {
+      method: 'POST',
+    }),
+
   uploadBiodata: async (fileUri: string, biodataType: 'uploaded' | 'generated') => {
     const formData = new FormData();
     const filename = fileUri.split('/').pop() || 'biodata.pdf';
