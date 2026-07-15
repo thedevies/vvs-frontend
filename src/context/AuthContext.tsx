@@ -105,11 +105,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error: any) {
       console.log('[Auth] Token validation failed:', error.message);
-      // If session expired, clear everything
-      if (error.message === 'SESSION_EXPIRED') {
-        await storage.clearAll();
-        setCachedToken(null);
-      } else {
+      
+      const isNetworkError = error.message && (
+        error.message.includes('Network request failed') ||
+        error.message.includes('Failed to fetch') ||
+        error.message.includes('network')
+      );
+
+      if (isNetworkError) {
         // Network error — try loading cached user data
         const cached = await storage.getUserData();
         if (cached) {
@@ -117,6 +120,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsAuthenticated(true);
           console.log('[Auth] Using cached user data');
         }
+      } else {
+        // Server rejected the token/request (e.g. database reset, user deleted, 401 Unauthorized, etc.)
+        // Clear everything to force user login/signup
+        console.log('[Auth] Stale or invalid session. Clearing storage...');
+        await storage.clearAll();
+        setCachedToken(null);
+        setUser(null);
+        setIsAuthenticated(false);
       }
     } finally {
       setIsLoading(false);
