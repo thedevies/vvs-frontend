@@ -359,5 +359,15 @@ export const interestApi = {
   },
 };
 
+// ─── Notification API ─────────────────────────────────────────────────────────
+
+export const notificationApi = {
+  registerDevice: (body: { deviceId: string; fcmToken: string; platform: 'ANDROID' | 'IOS' }) =>
+    request<ApiResponse>('/notification/register-device', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+};
+
 // Export base URL for debugging
 export { BASE_URL };

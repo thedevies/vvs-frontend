@@ -11,6 +11,7 @@ import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { ThemedText } from "@/components/themed-text";
 import { useLanguage } from "@/context/LanguageContext";
+import { useAppTheme } from "@/context/ThemeContext";
 import { testimonials } from "./index";
 
 const DARK = "#0B0B0D";
@@ -21,16 +22,17 @@ const PINK = "#FF4D8D";
 
 export default function SuccessStoriesScreen() {
   const { language } = useLanguage();
+  const { colors, isDark } = useAppTheme();
   const isMr = language === "mr";
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={["top"]}>
       {/* Header bar */}
-      <View style={styles.header}>
+      <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={24} color="#fff" />
+          <Feather name="arrow-left" size={24} color={colors.text} />
         </TouchableOpacity>
-        <ThemedText style={styles.headerTitle}>
+        <ThemedText style={[styles.headerTitle, { color: colors.text }]}>
           {isMr ? "यशस्वी कथा" : "Success Stories"}
         </ThemedText>
         <View style={styles.headerRightPlaceholder} />
@@ -41,7 +43,7 @@ export default function SuccessStoriesScreen() {
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
       >
-        <ThemedText style={styles.subtitle}>
+        <ThemedText style={[styles.subtitle, { color: colors.muted }]}>
           {isMr
             ? "वासुदेव विवाह सोहळा च्या माध्यमातून एकत्र आलेल्या जोडप्यांचे अनुभव."
             : "Beautiful matches united through Vasudev Vivah Sohala."}
@@ -49,7 +51,7 @@ export default function SuccessStoriesScreen() {
 
         <View style={styles.listContainer}>
           {testimonials.map((t, i) => (
-            <View key={i} style={styles.testimonialCard}>
+            <View key={i} style={[styles.testimonialCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={styles.testimonialTop}>
                 <View>
                   <ImageBackground
@@ -57,12 +59,12 @@ export default function SuccessStoriesScreen() {
                     style={styles.testimonialAvatar}
                     imageStyle={{ borderRadius: 30 }}
                   />
-                  <View style={styles.heartBadge}>
+                  <View style={[styles.heartBadge, { backgroundColor: colors.card2 }]}>
                     <ThemedText style={{ fontSize: 11 }}>💍</ThemedText>
                   </View>
                 </View>
                 <View style={styles.testimonialMeta}>
-                  <ThemedText style={styles.testimonialCouple}>
+                  <ThemedText style={[styles.testimonialCouple, { color: colors.text }]}>
                     {isMr ? t.coupleMr : t.coupleEn}
                   </ThemedText>
                   <ThemedText style={styles.testimonialCity}>

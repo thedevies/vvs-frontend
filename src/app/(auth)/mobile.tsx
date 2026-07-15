@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View, Modal } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View, Modal, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import * as Device from 'expo-device';
+import * as Notifications from 'expo-notifications';
+import * as ImagePicker from 'expo-image-picker';
+import * as SecureStore from 'expo-secure-store';
 
 import CustomButton from '@/components/ui/CustomButton';
 import CustomInput from '@/components/ui/CustomInput';
@@ -18,6 +22,51 @@ export default function MobileScreen() {
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [generatedOtp, setGeneratedOtp] = useState<string | null>(null);
   const { sendOtp } = useAuth();
+
+  const requestPermissionsAndToken = async () => {
+    try {
+      console.log('[Permissions] Requesting Storage, Camera, and Notifications permissions...');
+      
+      // 1. Request Camera Permission
+      const cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
+      console.log('[Permissions] Camera status:', cameraStatus.status);
+
+      // 2. Request Media Library (Storage) Permission
+      const mediaStatus = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      console.log('[Permissions] Media Library status:', mediaStatus.status);
+
+      // 3. Request Notification Permission
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      console.log('[Permissions] Notification status:', finalStatus);
+
+      if (finalStatus === 'granted') {
+        // 4. Generate FCM / Device token
+        try {
+          const tokenResult = await Notifications.getDevicePushTokenAsync();
+          const fcmToken = tokenResult.data;
+          
+          // Save the generated token in SecureStore to be synced upon user authentication
+          await SecureStore.setItemAsync('vvs_fcm_token', fcmToken);
+          console.log('[Push] Device Push Token generated and saved locally:', fcmToken);
+        } catch (tokenErr: any) {
+          console.log('[Push] Cannot generate native token in this environment (e.g. Expo Go SDK 53+ or Simulator):', tokenErr.message);
+          // Fallback dev token to let the app function seamlessly during development
+          const mockToken = 'dev-mock-fcm-token-' + Math.random().toString(36).substring(7);
+          await SecureStore.setItemAsync('vvs_fcm_token', mockToken);
+          console.log('[Push] Using fallback development token:', mockToken);
+        }
+      } else {
+        console.log('[Push] Notification permission was denied. Cannot generate token.');
+      }
+    } catch (err) {
+      console.warn('[Push] Error requesting permissions or generating token:', err);
+    }
+  };
 
   const handleSendOtp = async () => {
     setError('');
@@ -100,9 +149,13 @@ export default function MobileScreen() {
           <View style={styles.termsCheckboxRow}>
             <TouchableOpacity 
               style={styles.checkboxContainer} 
-              onPress={() => {
-                setAcceptedTerms(prev => !prev);
+              onPress={async () => {
+                const nextVal = !acceptedTerms;
+                setAcceptedTerms(nextVal);
                 setError('');
+                if (nextVal) {
+                  await requestPermissionsAndToken();
+                }
               }}
             >
               <Feather 
@@ -210,10 +263,11 @@ export default function MobileScreen() {
             
             <TouchableOpacity 
               style={styles.modalAcceptButton} 
-              onPress={() => {
+              onPress={async () => {
                 setAcceptedTerms(true);
                 setShowTermsModal(false);
                 setError('');
+                await requestPermissionsAndToken();
               }}
             >
               <ThemedText style={styles.modalAcceptButtonText}>Accept & Agree</ThemedText>

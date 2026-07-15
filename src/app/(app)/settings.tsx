@@ -16,14 +16,17 @@ import { ThemedText } from '@/components/themed-text';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { profileApi } from '@/utils/api';
+import { useAppTheme } from '@/context/ThemeContext';
 
 export default function SettingsScreen() {
   const { t, language, setLanguage } = useLanguage();
   const { logout } = useAuth();
+  const { colors, isDark, toggleTheme } = useAppTheme();
+  const styles = getStyles(colors);
+
+  const [accountOpen, setAccountOpen] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
-  const [accountOpen, setAccountOpen] = useState(false);
-
   const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
 
@@ -81,148 +84,195 @@ export default function SettingsScreen() {
     }
   };
 
-  const SETTINGS = [
-    {
-      titleKey: 'support' as const,
-      items: [
-        { key: 'helpCenter' as const,      icon: 'help-circle-outline' },
-        { key: 'reportProblem' as const,   icon: 'flag-outline' },
-        { key: 'termsConditions' as const, icon: 'document-text-outline' },
-        { key: 'privacyPolicy' as const,   icon: 'eye-outline' },
-      ],
-    },
+  const SUPPORT_ITEMS = [
+    { key: 'helpCenter' as const, icon: 'help-circle-outline' },
+    { key: 'reportProblem' as const, icon: 'flag-outline' },
+    { key: 'termsConditions' as const, icon: 'document-text-outline' },
+    { key: 'privacyPolicy' as const, icon: 'shield-checkmark-outline' },
   ];
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
 
-        {/* HEADER */}
+        {/* ── Header ── */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Ionicons name="chevron-back" size={24} color="#fff" />
+            <Ionicons name="chevron-back" size={22} color={colors.text} />
           </TouchableOpacity>
           <ThemedText style={styles.headerTitle}>{t('settings')}</ThemedText>
           <View style={{ width: 40 }} />
         </View>
 
-        {/* LANGUAGE TOGGLE */}
+        {/* ── Preferences ── */}
         <View style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>{t('language')}</ThemedText>
-          <View style={styles.langCard}>
-            <View style={styles.langLabelRow}>
-              <Ionicons name="language-outline" size={20} color="#fff" />
-              <ThemedText style={styles.langLabel}>{t('appLanguage')}</ThemedText>
+          <ThemedText style={styles.sectionTitle}>Preferences</ThemedText>
+
+          <View style={styles.groupCard}>
+            {/* Language Row */}
+            <View style={[styles.groupRow, { borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth }]}>
+              <View style={styles.rowLeft}>
+                <View style={styles.rowIconDot}>
+                  <Ionicons name="language-outline" size={16} color="#FF4D8D" />
+                </View>
+                <ThemedText style={[styles.rowLabel, { color: colors.text }]}>{t('appLanguage')}</ThemedText>
+              </View>
+              <View style={[styles.segmented, { backgroundColor: colors.background }]}>
+                <TouchableOpacity
+                  style={[styles.segmentOption, language === 'en' && styles.segmentOptionActive]}
+                  onPress={() => setLanguage('en')}>
+                  <ThemedText style={[styles.segmentText, { color: colors.muted }, language === 'en' && styles.segmentTextActive]}>
+                    {t('english')}
+                  </ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.segmentOption, language === 'mr' && styles.segmentOptionActive]}
+                  onPress={() => setLanguage('mr')}>
+                  <ThemedText style={[styles.segmentText, { color: colors.muted }, language === 'mr' && styles.segmentTextActive]}>
+                    {t('marathi')}
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
             </View>
-            <View style={styles.langToggle}>
-              <TouchableOpacity
-                style={[styles.langOption, language === 'en' && styles.langOptionActive]}
-                onPress={() => setLanguage('en')}>
-                <ThemedText style={[styles.langOptionText, language === 'en' && styles.langOptionTextActive]}>
-                  {t('english')}
-                </ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.langOption, language === 'mr' && styles.langOptionActive]}
-                onPress={() => setLanguage('mr')}>
-                <ThemedText style={[styles.langOptionText, language === 'mr' && styles.langOptionTextActive]}>
-                  {t('marathi')}
-                </ThemedText>
-              </TouchableOpacity>
+
+            {/* Theme Row */}
+            <View style={[styles.groupRow, { borderBottomWidth: 0 }]}>
+              <View style={styles.rowLeft}>
+                <View style={styles.rowIconDot}>
+                  <Ionicons name={isDark ? 'moon-outline' : 'sunny-outline'} size={16} color="#FF4D8D" />
+                </View>
+                <ThemedText style={[styles.rowLabel, { color: colors.text }]}>Appearance</ThemedText>
+              </View>
+              <View style={[styles.segmented, { backgroundColor: colors.background }]}>
+                <TouchableOpacity
+                  style={[styles.segmentOption, !isDark && styles.segmentOptionActive]}
+                  onPress={() => { if (isDark) toggleTheme(); }}>
+                  <ThemedText style={[styles.segmentText, { color: colors.muted }, !isDark && styles.segmentTextActive]}>
+                    Light
+                  </ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.segmentOption, isDark && styles.segmentOptionActive]}
+                  onPress={() => { if (!isDark) toggleTheme(); }}>
+                  <ThemedText style={[styles.segmentText, { color: colors.muted }, isDark && styles.segmentTextActive]}>
+                    Dark
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </View>
 
-        {/* ACCOUNT SECTION (COLLAPSIBLE) */}
+        {/* ── Account ── */}
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>{t('account')}</ThemedText>
-          
-          <TouchableOpacity 
-            style={styles.settingItem} 
-            onPress={() => setAccountOpen((prev) => !prev)}>
-            <View style={styles.settingLeft}>
-              <View style={styles.settingIconBox}>
-                <Ionicons name="person-circle-outline" size={18} color="#FF4D8D" />
+
+          <View style={styles.groupCard}>
+            <TouchableOpacity
+              style={[
+                styles.groupRow,
+                accountOpen && { borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth },
+              ]}
+              activeOpacity={0.7}
+              onPress={() => setAccountOpen((prev) => !prev)}>
+              <View style={styles.rowLeft}>
+                <View style={styles.rowIconDot}>
+                  <Ionicons name="person-circle-outline" size={16} color="#FF4D8D" />
+                </View>
+                <ThemedText style={[styles.rowLabel, { color: colors.text }]}>Account Settings</ThemedText>
               </View>
-              <ThemedText style={styles.settingText}>Account Settings</ThemedText>
-            </View>
-            <Ionicons name={accountOpen ? 'chevron-down' : 'chevron-forward'} size={18} color="#555" />
-          </TouchableOpacity>
+              <Ionicons name={accountOpen ? 'chevron-up' : 'chevron-down'} size={18} color={colors.muted} />
+            </TouchableOpacity>
 
-          {accountOpen && (
-            <View style={styles.accountSubOptions}>
-              <TouchableOpacity 
-                style={styles.subSettingItem} 
-                onPress={() => handleItemPress('editProfile')}>
-                <View style={styles.settingLeft}>
-                  <Ionicons name="person-outline" size={16} color="#aaa" />
-                  <ThemedText style={styles.subSettingText}>{t('editProfile')}</ThemedText>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color="#555" />
-              </TouchableOpacity>
+            {accountOpen && (
+              <View>
+                <TouchableOpacity
+                  style={[styles.subRow, { borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth }]}
+                  onPress={() => handleItemPress('editProfile')}>
+                  <View style={styles.rowLeft}>
+                    <Ionicons name="person-outline" size={16} color={colors.textSecondary ?? colors.text} style={{ width: 20 }} />
+                    <ThemedText style={[styles.subRowLabel, { color: colors.text }]}>{t('editProfile')}</ThemedText>
+                  </View>
+                  <Ionicons name="chevron-forward" size={15} color={colors.muted} />
+                </TouchableOpacity>
 
-              <TouchableOpacity 
-                style={styles.subSettingItem} 
-                onPress={() => handleItemPress('changePassword')}>
-                <View style={styles.settingLeft}>
-                  <Ionicons name="lock-closed-outline" size={16} color="#aaa" />
-                  <ThemedText style={styles.subSettingText}>{t('changePassword')}</ThemedText>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color="#555" />
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.subRow, { borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth }]}
+                  onPress={() => handleItemPress('changePassword')}>
+                  <View style={styles.rowLeft}>
+                    <Ionicons name="lock-closed-outline" size={16} color={colors.textSecondary ?? colors.text} style={{ width: 20 }} />
+                    <ThemedText style={[styles.subRowLabel, { color: colors.text }]}>{t('changePassword')}</ThemedText>
+                  </View>
+                  <Ionicons name="chevron-forward" size={15} color={colors.muted} />
+                </TouchableOpacity>
 
-              <TouchableOpacity 
-                style={[styles.subSettingItem, { borderBottomWidth: 0 }]} 
-                onPress={() => setShowDangerZoneModal(true)}>
-                <View style={styles.settingLeft}>
-                  <Ionicons name="warning-outline" size={16} color="#ff4d4d" />
-                  <ThemedText style={[styles.subSettingText, { color: '#ff4d4d', fontWeight: 'bold' }]}>Danger Zone</ThemedText>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color="#ff4d4d" />
-              </TouchableOpacity>
-            </View>
-          )}
+                <TouchableOpacity
+                  style={[styles.subRow, { borderBottomWidth: 0 }]}
+                  onPress={() => setShowDangerZoneModal(true)}>
+                  <View style={styles.rowLeft}>
+                    <Ionicons name="warning-outline" size={16} color="#ff4d4d" style={{ width: 20 }} />
+                    <ThemedText style={[styles.subRowLabel, { color: '#ff4d4d', fontWeight: '700' }]}>Danger Zone</ThemedText>
+                  </View>
+                  <Ionicons name="chevron-forward" size={15} color="#ff4d4d" />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
         </View>
 
-        {/* SETTINGS SECTIONS */}
-        {SETTINGS.map((section, i) => (
-          <View key={i} style={styles.section}>
-            <ThemedText style={styles.sectionTitle}>{t(section.titleKey)}</ThemedText>
-            {section.items.map((item, j) => (
-              <TouchableOpacity key={j} style={styles.settingItem} onPress={() => handleItemPress(item.key)}>
-                <View style={styles.settingLeft}>
-                  <View style={styles.settingIconBox}>
-                    <Ionicons name={item.icon as any} size={18} color="#aaa" />
+        {/* ── Support ── */}
+        <View style={styles.section}>
+          <ThemedText style={styles.sectionTitle}>{t('support')}</ThemedText>
+
+          <View style={styles.groupCard}>
+            {SUPPORT_ITEMS.map((item, idx) => (
+              <TouchableOpacity
+                key={item.key}
+                style={[
+                  styles.groupRow,
+                  idx < SUPPORT_ITEMS.length - 1 && {
+                    borderBottomColor: colors.border,
+                    borderBottomWidth: StyleSheet.hairlineWidth,
+                  },
+                ]}
+                activeOpacity={0.7}
+                onPress={() => handleItemPress(item.key)}>
+                <View style={styles.rowLeft}>
+                  <View style={styles.rowIconDot}>
+                    <Ionicons name={item.icon as any} size={16} color="#FF4D8D" />
                   </View>
-                  <ThemedText style={styles.settingText}>{t(item.key)}</ThemedText>
+                  <ThemedText style={[styles.rowLabel, { color: colors.text }]}>{t(item.key)}</ThemedText>
                 </View>
-                <Ionicons name="chevron-forward" size={18} color="#555" />
+                <Ionicons name="chevron-forward" size={17} color={colors.muted} />
               </TouchableOpacity>
             ))}
           </View>
-        ))}
+        </View>
 
-        {/* LOGOUT BUTTON */}
-        <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-          <Ionicons name="log-out-outline" size={20} color="#FF4D8D" />
-          <ThemedText style={styles.logoutText}>{t('logout')}</ThemedText>
-        </TouchableOpacity>
+        {/* ── Logout ── */}
+        <View style={styles.section}>
+          <TouchableOpacity style={styles.logoutButton} onPress={logout} activeOpacity={0.75}>
+            <Ionicons name="log-out-outline" size={18} color="#FF4D8D" />
+            <ThemedText style={styles.logoutText}>{t('logout')}</ThemedText>
+          </TouchableOpacity>
+        </View>
 
       </ScrollView>
-      {/* TERMS & CONDITIONS MODAL */}
+
+      {/* ── TERMS & CONDITIONS MODAL ── */}
       <Modal visible={showTermsModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <ThemedText style={styles.modalTitle}>{t('termsConditions')}</ThemedText>
-              <TouchableOpacity onPress={() => setShowTermsModal(false)}>
-                <Ionicons name="close" size={24} color="#fff" />
+              <TouchableOpacity onPress={() => setShowTermsModal(false)} style={styles.modalXBtn}>
+                <Ionicons name="close" size={20} color={colors.text} />
               </TouchableOpacity>
             </View>
 
             <ScrollView contentContainerStyle={styles.modalBody} showsVerticalScrollIndicator={false}>
               <ThemedText style={styles.policySubTitle}>Last Updated: July 2026</ThemedText>
-              
+
               <ThemedText style={styles.policySectionHeader}>1. Acceptance of Terms</ThemedText>
               <ThemedText style={styles.policyBodyText}>
                 By creating an account on VVS Matrimony, you agree to be bound by these Terms and Conditions. If you do not agree, please do not access or use our services.
@@ -247,20 +297,19 @@ export default function SettingsScreen() {
               <ThemedText style={styles.policyBodyText}>
                 VVS Matrimony does not conduct background checks on members' personal or financial status. Users are advised to independently verify all details before proceeding with matrimonial alliances.
               </ThemedText>
-
             </ScrollView>
           </View>
         </View>
       </Modal>
 
-      {/* PRIVACY POLICY MODAL */}
+      {/* ── PRIVACY POLICY MODAL ── */}
       <Modal visible={showPrivacyModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <ThemedText style={styles.modalTitle}>{t('privacyPolicy')}</ThemedText>
-              <TouchableOpacity onPress={() => setShowPrivacyModal(false)}>
-                <Ionicons name="close" size={24} color="#fff" />
+              <TouchableOpacity onPress={() => setShowPrivacyModal(false)} style={styles.modalXBtn}>
+                <Ionicons name="close" size={20} color={colors.text} />
               </TouchableOpacity>
             </View>
 
@@ -291,155 +340,145 @@ export default function SettingsScreen() {
               <ThemedText style={styles.policyBodyText}>
                 If you have any questions about this Privacy Policy or wish to request data deletion, please contact us at support@vvsmatrimony.org.
               </ThemedText>
-
             </ScrollView>
           </View>
         </View>
       </Modal>
 
-      {/* DEACTIVATE ACCOUNT CONFIRMATION MODAL */}
+      {/* ── DEACTIVATE ACCOUNT CONFIRMATION MODAL ── */}
       <Modal visible={showConfirmDeactivateModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.confirmDeleteModalContent}>
-            <TouchableOpacity 
-              style={styles.modalCloseButton} 
-              onPress={() => setShowConfirmDeactivateModal(false)}
-            >
-              <Ionicons name="close" size={20} color="#fff" />
+          <View style={styles.confirmModalContent}>
+            <TouchableOpacity style={styles.modalCloseButton} onPress={() => setShowConfirmDeactivateModal(false)}>
+              <Ionicons name="close" size={18} color={colors.text} />
             </TouchableOpacity>
 
-            <View style={styles.confirmDeleteHeader}>
-              <Ionicons name="pause-circle-outline" size={32} color="#FF9F1C" />
-              <ThemedText style={[styles.confirmDeleteTitle, { color: '#FF9F1C' }]}>Deactivate Your Account?</ThemedText>
+            <View style={styles.confirmIconWrap}>
+              <View style={[styles.confirmIconCircle, { backgroundColor: 'rgba(255,159,28,0.12)' }]}>
+                <Ionicons name="pause-circle-outline" size={26} color="#FF9F1C" />
+              </View>
+              <ThemedText style={[styles.confirmTitle, { color: '#FF9F1C' }]}>Deactivate Your Account?</ThemedText>
             </View>
 
-            <ScrollView contentContainerStyle={styles.confirmDeleteBody} showsVerticalScrollIndicator={false}>
-              <ThemedText style={styles.confirmDeleteWarningIntro}>
+            <ScrollView contentContainerStyle={styles.confirmBody} showsVerticalScrollIndicator={false}>
+              <ThemedText style={styles.confirmIntro}>
                 Deactivating your account will hide your profile from all other members. You can re-activate your account anytime by logging back in.
               </ThemedText>
 
-              <ThemedText style={styles.confirmDeleteConfirmationPrompt}>
+              <ThemedText style={styles.confirmPrompt}>
                 Are you sure you want to deactivate your account?
               </ThemedText>
 
-              <View style={styles.confirmDeleteActions}>
-                <TouchableOpacity 
-                  style={[styles.confirmDeleteBtnFinal, { backgroundColor: '#FF9F1C', marginBottom: 20 }]} 
-                  onPress={confirmDeactivateAccount}
-                  disabled={deactivatingAccount}>
-                  {deactivatingAccount ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <ThemedText style={styles.confirmDeleteBtnFinalText}>Yes, Deactivate My Account</ThemedText>
-                  )}
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={[styles.confirmBtnFinal, { backgroundColor: '#FF9F1C' }]}
+                onPress={confirmDeactivateAccount}
+                disabled={deactivatingAccount}>
+                {deactivatingAccount ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <ThemedText style={styles.confirmBtnFinalText}>Yes, Deactivate My Account</ThemedText>
+                )}
+              </TouchableOpacity>
             </ScrollView>
           </View>
         </View>
       </Modal>
 
-      {/* DELETE ACCOUNT CONFIRMATION MODAL */}
+      {/* ── DELETE ACCOUNT CONFIRMATION MODAL ── */}
       <Modal visible={showConfirmDeleteModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.confirmDeleteModalContent}>
-            <TouchableOpacity 
-              style={styles.modalCloseButton} 
-              onPress={() => setShowConfirmDeleteModal(false)}
-            >
-              <Ionicons name="close" size={20} color="#fff" />
+          <View style={styles.confirmModalContent}>
+            <TouchableOpacity style={styles.modalCloseButton} onPress={() => setShowConfirmDeleteModal(false)}>
+              <Ionicons name="close" size={18} color={colors.text} />
             </TouchableOpacity>
 
-            <View style={styles.confirmDeleteHeader}>
-              <Ionicons name="warning-outline" size={32} color="#ff4d4d" />
-              <ThemedText style={styles.confirmDeleteTitle}>Delete Your Account?</ThemedText>
+            <View style={styles.confirmIconWrap}>
+              <View style={[styles.confirmIconCircle, { backgroundColor: 'rgba(255,77,77,0.12)' }]}>
+                <Ionicons name="warning-outline" size={26} color="#ff4d4d" />
+              </View>
+              <ThemedText style={styles.confirmTitle}>Delete Your Account?</ThemedText>
             </View>
 
-            <ScrollView contentContainerStyle={styles.confirmDeleteBody} showsVerticalScrollIndicator={false}>
-              <ThemedText style={styles.confirmDeleteWarningIntro}>
+            <ScrollView contentContainerStyle={styles.confirmBody} showsVerticalScrollIndicator={false}>
+              <ThemedText style={styles.confirmIntro}>
                 This is a highly critical and irreversible action. Once you proceed, the following data will be permanently destroyed and cannot be recovered:
               </ThemedText>
 
               <View style={styles.warningList}>
                 <View style={styles.warningItem}>
-                  <Ionicons name="close-circle-outline" size={18} color="#ff4d4d" />
+                  <Ionicons name="close-circle-outline" size={17} color="#ff4d4d" />
                   <ThemedText style={styles.warningItemText}>Your personal matrimonial profile data.</ThemedText>
                 </View>
                 <View style={styles.warningItem}>
-                  <Ionicons name="close-circle-outline" size={18} color="#ff4d4d" />
+                  <Ionicons name="close-circle-outline" size={17} color="#ff4d4d" />
                   <ThemedText style={styles.warningItemText}>All uploaded profile and gallery photos.</ThemedText>
                 </View>
                 <View style={styles.warningItem}>
-                  <Ionicons name="close-circle-outline" size={18} color="#ff4d4d" />
+                  <Ionicons name="close-circle-outline" size={17} color="#ff4d4d" />
                   <ThemedText style={styles.warningItemText}>Matrimonial Biodata documents (PDFs).</ThemedText>
                 </View>
-                <View style={styles.warningItem}>
-                  <Ionicons name="close-circle-outline" size={18} color="#ff4d4d" />
+                <View style={[styles.warningItem, { marginBottom: 0 }]}>
+                  <Ionicons name="close-circle-outline" size={17} color="#ff4d4d" />
                   <ThemedText style={styles.warningItemText}>All active connection interests and chats.</ThemedText>
                 </View>
               </View>
 
-              <ThemedText style={styles.confirmDeleteConfirmationPrompt}>
+              <ThemedText style={styles.confirmPrompt}>
                 Are you absolutely sure you want to proceed with account deletion?
               </ThemedText>
 
-              <View style={styles.confirmDeleteActions}>
-                <TouchableOpacity 
-                  style={[styles.confirmDeleteBtnFinal, { marginBottom: 20 }]} 
-                  onPress={confirmDeleteAccount}
-                  disabled={deletingAccount}>
-                  {deletingAccount ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <ThemedText style={styles.confirmDeleteBtnFinalText}>Yes, Delete My Account</ThemedText>
-                  )}
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={styles.confirmBtnFinal}
+                onPress={confirmDeleteAccount}
+                disabled={deletingAccount}>
+                {deletingAccount ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <ThemedText style={styles.confirmBtnFinalText}>Yes, Delete My Account</ThemedText>
+                )}
+              </TouchableOpacity>
             </ScrollView>
           </View>
         </View>
       </Modal>
 
-      {/* DANGER ZONE MODAL */}
+      {/* ── DANGER ZONE MODAL ── */}
       <Modal visible={showDangerZoneModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.confirmDeleteModalContent}>
-            <TouchableOpacity 
-              style={styles.modalCloseButton} 
-              onPress={() => setShowDangerZoneModal(false)}
-            >
-              <Ionicons name="close" size={20} color="#fff" />
+          <View style={styles.confirmModalContent}>
+            <TouchableOpacity style={styles.modalCloseButton} onPress={() => setShowDangerZoneModal(false)}>
+              <Ionicons name="close" size={18} color={colors.text} />
             </TouchableOpacity>
 
-            <View style={styles.confirmDeleteHeader}>
-              <Ionicons name="warning-outline" size={32} color="#ff4d4d" />
-              <ThemedText style={styles.confirmDeleteTitle}>Danger Zone</ThemedText>
+            <View style={styles.confirmIconWrap}>
+              <View style={[styles.confirmIconCircle, { backgroundColor: 'rgba(255,77,77,0.12)' }]}>
+                <Ionicons name="warning-outline" size={26} color="#ff4d4d" />
+              </View>
+              <ThemedText style={styles.confirmTitle}>Danger Zone</ThemedText>
             </View>
 
-            <View style={styles.confirmDeleteBody}>
-              <ThemedText style={styles.confirmDeleteWarningIntro}>
+            <View style={styles.confirmBody}>
+              <ThemedText style={styles.confirmIntro}>
                 Select an action below to temporarily hide your account or permanently delete your data.
               </ThemedText>
 
-              <View style={{ gap: 14, marginTop: 20, marginBottom: 24 }}>
-                {/* Deactivate Button */}
-                <TouchableOpacity 
-                  style={[styles.confirmDeleteBtnFinal, { backgroundColor: '#FF9F1C' }]} 
+              <View style={{ gap: 12, marginTop: 20 }}>
+                <TouchableOpacity
+                  style={[styles.confirmBtnFinal, { backgroundColor: '#FF9F1C' }]}
                   onPress={() => {
                     setShowDangerZoneModal(false);
                     setShowConfirmDeactivateModal(true);
                   }}>
-                  <ThemedText style={styles.confirmDeleteBtnFinalText}>Deactivate Account</ThemedText>
+                  <ThemedText style={styles.confirmBtnFinalText}>Deactivate Account</ThemedText>
                 </TouchableOpacity>
 
-                {/* Delete Button */}
-                <TouchableOpacity 
-                  style={[styles.confirmDeleteBtnFinal, { backgroundColor: '#ff4d4d' }]} 
+                <TouchableOpacity
+                  style={[styles.confirmBtnFinal, { backgroundColor: '#ff4d4d' }]}
                   onPress={() => {
                     setShowDangerZoneModal(false);
                     setShowConfirmDeleteModal(true);
                   }}>
-                  <ThemedText style={styles.confirmDeleteBtnFinalText}>Delete Account</ThemedText>
+                  <ThemedText style={styles.confirmBtnFinalText}>Delete Account</ThemedText>
                 </TouchableOpacity>
               </View>
             </View>
@@ -451,144 +490,150 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0B0B0D',
+    backgroundColor: colors.background,
     paddingHorizontal: 16,
   },
+
+  // ── Header ──
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 30,
+    marginTop: 8,
+    marginBottom: 28,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#17171C',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.card,
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {
-    color: '#fff',
-    fontSize: 24,
+    color: colors.text,
+    fontSize: 20,
     fontWeight: '800',
+    letterSpacing: -0.3,
   },
+
+  // ── Section ──
   section: {
-    marginBottom: 26,
+    marginBottom: 24,
   },
   sectionTitle: {
-    color: '#888',
-    fontSize: 13,
-    fontWeight: '600',
-    marginBottom: 12,
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 10,
     marginLeft: 4,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
 
-  // Language card
-  langCard: {
-    backgroundColor: '#17171C',
-    borderRadius: 18,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    gap: 14,
+  // ── Grouped card & rows ──
+  groupCard: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    overflow: 'hidden',
   },
-  langLabelRow: {
+  groupRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-  },
-  langLabel: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  langToggle: {
-    flexDirection: 'row',
-    backgroundColor: '#0B0B0D',
-    borderRadius: 12,
-    padding: 4,
-    gap: 4,
-  },
-  langOption: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  langOptionActive: {
-    backgroundColor: '#FF4D8D',
-  },
-  langOptionText: {
-    color: '#888',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  langOptionTextActive: {
-    color: '#fff',
-  },
-
-  // Settings items
-  settingItem: {
-    backgroundColor: '#17171C',
-    borderRadius: 18,
-    height: 58,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    minHeight: 58,
   },
-  settingLeft: {
+  rowLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  settingIconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: '#222228',
+  rowIconDot: {
+    width: 30,
+    height: 30,
+    borderRadius: 9,
+    backgroundColor: 'rgba(255,77,141,0.08)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  settingText: {
-    color: '#fff',
-    fontSize: 15,
+  rowLabel: {
+    fontSize: 14,
     fontWeight: '600',
   },
-  logoutButton: {
-    marginTop: 10,
-    backgroundColor: 'rgba(255, 77, 141, 0.1)',
-    borderRadius: 18,
-    height: 58,
-    justifyContent: 'center',
-    alignItems: 'center',
+
+  // ── Segmented control ──
+  segmented: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 40,
+    borderRadius: 10,
+    padding: 3,
+    gap: 3,
+  },
+  segmentOption: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  segmentOptionActive: {
+    backgroundColor: '#FF4D8D',
+  },
+  segmentText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  segmentTextActive: {
+    color: '#fff',
+  },
+
+  // ── Account sub rows ──
+  subRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    paddingLeft: 16,
+  },
+  subRowLabel: {
+    fontSize: 13.5,
+    fontWeight: '500',
+  },
+
+  // ── Logout ──
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 52,
+    borderRadius: 14,
+    borderWidth: 1.2,
+    borderColor: 'rgba(255,77,141,0.35)',
+    backgroundColor: 'rgba(255,77,141,0.06)',
   },
   logoutText: {
     color: '#FF4D8D',
     fontWeight: '700',
+    fontSize: 14,
   },
 
-  // Modal & Policy Guides Styles
+  // ── Terms/Privacy Modal ──
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: colors.modalOverlay,
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#151519',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingTop: 20,
+    backgroundColor: colors.card,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    paddingTop: 18,
     paddingHorizontal: 20,
     maxHeight: '85%',
   },
@@ -596,78 +641,53 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    paddingBottom: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
   },
   modalTitle: {
-    color: '#fff',
-    fontSize: 20,
+    color: colors.text,
+    fontSize: 18,
     fontWeight: '800',
   },
+  modalXBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.card2 ?? colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   modalBody: {
-    paddingVertical: 20,
+    paddingVertical: 18,
     paddingBottom: 40,
   },
   policySubTitle: {
-    color: '#8E8E95',
+    color: colors.muted,
     fontSize: 12,
-    marginBottom: 20,
+    marginBottom: 18,
   },
   policySectionHeader: {
     color: '#FF4D8D',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
-    marginTop: 18,
-    marginBottom: 8,
+    marginTop: 16,
+    marginBottom: 6,
   },
   policyBodyText: {
-    color: '#CFCFD6',
-    fontSize: 14,
-    lineHeight: 22,
+    color: colors.text,
+    fontSize: 13.5,
+    lineHeight: 21,
+    opacity: 0.85,
   },
-  closeModalButton: {
-    backgroundColor: '#FF4D8D',
-    borderRadius: 16,
-    height: 52,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 32,
-  },
-  closeModalButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  accountSubOptions: {
-    backgroundColor: '#131317',
-    borderRadius: 18,
-    marginTop: -4,
-    marginBottom: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.03)',
-  },
-  subSettingItem: {
-    height: 52,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  subSettingText: {
-    color: '#D0D0DC',
-    fontSize: 14,
-    fontWeight: '500',
-    marginLeft: 12,
-  },
-  // Confirm Delete Modal Styles
-  confirmDeleteModalContent: {
-    backgroundColor: '#151519',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingTop: 24,
-    paddingHorizontal: 24,
+
+  // ── Confirmation modals (deactivate/delete/danger zone) ──
+  confirmModalContent: {
+    backgroundColor: colors.card,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    paddingTop: 22,
+    paddingHorizontal: 22,
     maxHeight: '90%',
     position: 'relative',
   },
@@ -675,86 +695,83 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 16,
     right: 16,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: 'rgba(255,255,255,0.08)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 100,
   },
-  confirmDeleteHeader: {
+  confirmIconWrap: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 18,
+    marginTop: 4,
   },
-  confirmDeleteTitle: {
+  confirmIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  confirmTitle: {
     color: '#ff4d4d',
-    fontSize: 22,
+    fontSize: 19,
     fontWeight: '800',
-    marginTop: 10,
-  },
-  confirmDeleteBody: {
-    paddingBottom: 40,
-  },
-  confirmDeleteWarningIntro: {
-    color: '#CFCFD6',
-    fontSize: 14,
-    lineHeight: 22,
     textAlign: 'center',
-    marginBottom: 20,
+  },
+  confirmBody: {
+    paddingBottom: 36,
+  },
+  confirmIntro: {
+    color: colors.text,
+    fontSize: 13.5,
+    lineHeight: 21,
+    textAlign: 'center',
+    marginBottom: 18,
+    opacity: 0.85,
   },
   warningList: {
-    backgroundColor: '#1E1416',
-    borderRadius: 16,
-    padding: 16,
+    backgroundColor: 'rgba(255, 77, 77, 0.05)',
+    borderRadius: 14,
+    padding: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255, 77, 77, 0.1)',
-    marginBottom: 24,
+    borderColor: 'rgba(255, 77, 77, 0.12)',
+    marginBottom: 22,
   },
   warningItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 12,
+    gap: 9,
+    marginBottom: 11,
   },
   warningItemText: {
-    color: '#E0CCD0',
-    fontSize: 13,
+    color: colors.text,
+    fontSize: 12.5,
     fontWeight: '500',
+    opacity: 0.9,
+    flex: 1,
   },
-  confirmDeleteConfirmationPrompt: {
-    color: '#fff',
-    fontSize: 14,
+  confirmPrompt: {
+    color: colors.text,
+    fontSize: 13.5,
     fontWeight: '600',
     textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 20,
+    marginBottom: 20,
+    lineHeight: 19,
   },
-  confirmDeleteActions: {
-    gap: 12,
-  },
-  confirmDeleteBtnFinal: {
+  confirmBtnFinal: {
     backgroundColor: '#ff4d4d',
-    borderRadius: 16,
-    height: 52,
+    borderRadius: 14,
+    height: 50,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  confirmDeleteBtnFinalText: {
+  confirmBtnFinalText: {
     color: '#fff',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
-  },
-  cancelDeleteBtn: {
-    backgroundColor: '#222228',
-    borderRadius: 16,
-    height: 52,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cancelDeleteBtnText: {
-    color: '#aaa',
-    fontSize: 15,
-    fontWeight: '600',
   },
 });

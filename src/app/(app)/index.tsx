@@ -22,8 +22,12 @@ import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { profileApi, BASE_URL } from "@/utils/api";
 import AuthModal from "@/components/ui/AuthModal";
+import { useAppTheme } from "@/context/ThemeContext";
 
 const { width: SW, height: SH } = Dimensions.get("window");
+
+const heroImageDark = require("@/assets/images/heroImageDark.jpg");
+const heroImageLight = require("@/assets/images/heroImageLight.png");
 
 // ─── Theme (same as profile.tsx / settings.tsx) ───────────────────────────────
 const DARK = "#0B0B0D";
@@ -207,18 +211,19 @@ function CollapsibleHeading({
   expanded: boolean;
   onPress: () => void;
 }) {
+  const { colors } = useAppTheme();
   return (
     <TouchableOpacity
-      style={styles.collapsibleHeading}
+      style={[styles.collapsibleHeading, { backgroundColor: colors.card, borderColor: colors.border }]}
       onPress={onPress}
       activeOpacity={0.85}
     >
       <ThemedText style={styles.sectionTitle}>{isMr ? mr : en}</ThemedText>
-      <View style={styles.chevronWrap}>
+      <View style={[styles.chevronWrap, { backgroundColor: colors.border }]}>
         <Feather
           name={expanded ? "chevron-down" : "chevron-right"}
           size={18}
-          color={WHITE}
+          color={colors.text}
         />
       </View>
     </TouchableOpacity>
@@ -226,8 +231,9 @@ function CollapsibleHeading({
 }
 
 function AboutSection({ isMr }: { isMr: boolean }) {
+  const { colors } = useAppTheme();
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={styles.aboutIconRow}>
         <ThemedText style={styles.aboutIcon}>🦚</ThemedText>
         <View style={styles.pill}>
@@ -262,6 +268,7 @@ function AboutSection({ isMr }: { isMr: boolean }) {
 }
 
 function HowItWorksSection({ isMr }: { isMr: boolean }) {
+  const { colors } = useAppTheme();
   return (
     <View>
       {steps.map((s, i) => (
@@ -272,7 +279,7 @@ function HowItWorksSection({ isMr }: { isMr: boolean }) {
             </View>
             {i < steps.length - 1 && <View style={styles.stepConnector} />}
           </View>
-          <View style={[styles.card, styles.stepCard]}>
+          <View style={[styles.card, styles.stepCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.stepEmojiRow}>
               <ThemedText style={styles.stepEmoji}>{s.emoji}</ThemedText>
               <ThemedText style={styles.stepTitle}>
@@ -290,6 +297,7 @@ function HowItWorksSection({ isMr }: { isMr: boolean }) {
 }
 
 function EventsSection({ isMr }: { isMr: boolean }) {
+  const { colors } = useAppTheme();
   return (
     <ScrollView
       horizontal
@@ -297,7 +305,7 @@ function EventsSection({ isMr }: { isMr: boolean }) {
       contentContainerStyle={styles.hScroll}
     >
       {events.map((e, i) => (
-        <View key={i} style={[styles.card, styles.eventCard]}>
+        <View key={i} style={[styles.card, styles.eventCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.eventTagRow}>
             <View
               style={[
@@ -335,6 +343,17 @@ function EventsSection({ isMr }: { isMr: boolean }) {
 }
 
 function TestimonialsSection({ isMr }: { isMr: boolean }) {
+  const { colors } = useAppTheme();
+  const isNavigating = useRef(false);
+  const navigateSafe = (route: any) => {
+    if (isNavigating.current) return;
+    isNavigating.current = true;
+    setTimeout(() => {
+      isNavigating.current = false;
+    }, 1000);
+    router.push(route);
+  };
+
   return (
     <ScrollView 
       horizontal 
@@ -342,7 +361,7 @@ function TestimonialsSection({ isMr }: { isMr: boolean }) {
       contentContainerStyle={{ paddingRight: 20, gap: 16 }}
     >
       {testimonials.slice(0, 6).map((t, i) => (
-        <View key={i} style={styles.testimonialHorizontalCard}>
+        <View key={i} style={[styles.testimonialHorizontalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.testimonialTop}>
             <View>
               <ImageBackground
@@ -376,8 +395,8 @@ function TestimonialsSection({ isMr }: { isMr: boolean }) {
 
       {/* 7th item: Explore All button card */}
       <TouchableOpacity 
-        style={styles.exploreMoreStoriesCard} 
-        onPress={() => router.push("/success-stories")}
+        style={[styles.exploreMoreStoriesCard, { backgroundColor: colors.card, borderColor: colors.border }]} 
+        onPress={() => navigateSafe("/success-stories")}
       >
         <View style={styles.exploreCirclePink}>
           <Feather name="arrow-right" size={24} color="#FF4D8D" />
@@ -395,6 +414,7 @@ function TestimonialsSection({ isMr }: { isMr: boolean }) {
 export default function HomeScreen() {
   const { language } = useLanguage();
   const { isAuthenticated, profileCompleted, user } = useAuth();
+  const { colors, isDark } = useAppTheme();
   const isMr = language === "mr";
   const [fontsLoaded] = useFonts({
     GrandHotel: require('@/assets/fonts/GrandHotel-Regular.ttf'),
@@ -408,6 +428,16 @@ export default function HomeScreen() {
   // Real matches state & Auth Modal state
   const [realMatches, setRealMatches] = useState<any[]>([]);
   const [showAuthModal, setShowAuthModal] = useState(false);
+
+  const isNavigating = useRef(false);
+  const navigateSafe = (route: any) => {
+    if (isNavigating.current) return;
+    isNavigating.current = true;
+    setTimeout(() => {
+      isNavigating.current = false;
+    }, 1000);
+    router.push(route);
+  };
 
   const getAge = (dobString: string): number => {
     if (!dobString) return 25;
@@ -502,15 +532,23 @@ export default function HomeScreen() {
     extrapolate: "clamp",
   });
 
+  const navBgColor = scrollY.interpolate({
+    inputRange: [0, 80],
+    outputRange: isDark
+      ? ["#17171C", "#17171C"]
+      : ["#E2E2E6", "#FFFFFF"],
+    extrapolate: "clamp",
+  });
+
   const handlePrimaryAction = () => {
     if (!isAuthenticated) {
       setShowAuthModal(true);
       return;
     }
     if (profileCompleted) {
-      router.push("/explore");
+      navigateSafe("/explore");
     } else {
-      router.push("/edit-profile");
+      navigateSafe("/edit-profile");
     }
   };
 
@@ -519,7 +557,7 @@ export default function HomeScreen() {
       setShowAuthModal(true);
       return;
     }
-    router.push("/explore");
+    navigateSafe("/explore");
   };
 
   const primaryLabel = profileCompleted
@@ -535,32 +573,36 @@ export default function HomeScreen() {
   }
 
   return (
-    <View style={styles.root}>
-      <StatusBar barStyle="light-content" />
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
       {/* Fixed Top Navigation Header */}
       <Animated.View
         style={[
           styles.topHeader,
-          { transform: [{ translateY: navbarTranslateY }] },
+          { 
+            transform: [{ translateY: navbarTranslateY }], 
+            backgroundColor: navBgColor, 
+            borderBottomColor: colors.border 
+          },
         ]}
       >
         <SafeAreaView edges={["top"]}>
           <View style={styles.topHeaderContent}>
             {/* Left: Brand name */}
-            <ThemedText style={[styles.headerCursiveTitle, { fontSize: isMr ? 21 : 32, fontFamily: isMr ? "YatraOne" : "GrandHotel" }]}>
+            <ThemedText style={[styles.headerCursiveTitle, { fontSize: isMr ? 21 : 32, fontFamily: isMr ? "YatraOne" : "GrandHotel", color: colors.text }]}>
               {isMr ? "वासुदेव विवाह सोहळा" : "Vasudev Vivah Sohala"}
             </ThemedText>
 
             {/* Right Corner: Bell notification icon */}
-            <TouchableOpacity
-              style={styles.notifBtn}
-              onPress={() => router.push("/requests")}
+            <TouchableOpacity 
+              style={[styles.notifBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={() => navigateSafe("/requests")}
             >
               <Feather
                 name="bell"
                 size={20}
-                color={WHITE}
+                color={colors.text}
               />
             </TouchableOpacity>
           </View>
@@ -579,21 +621,19 @@ export default function HomeScreen() {
         {/* ── Hero ── */}
         <Animated.View style={{ opacity: heroOpacity }}>
           <ImageBackground
-            source={{
-              uri: "https://imgs.search.brave.com/5N3BuKcZGSaIBczY-iE6H99tw2tlKBNtmkfw69VoK4I/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly9pLnBp/bmltZy5jb20vb3Jp/Z2luYWxzLzg2L2Fm/LzkyLzg2YWY5MjNi/YTEwMjZkNGJjOWE0/OGRmNDc1YmM1OGUw/LmpwZw",
-            }}
+            source={isDark ? heroImageDark : heroImageLight}
             style={styles.hero}
             imageStyle={styles.heroImg}
             resizeMode="cover"
           >
-            <View style={styles.heroOverlay}>
+            <View style={[styles.heroOverlay, { backgroundColor: isDark ? "rgba(5,5,10,0.62)" : "rgba(5,5,10,0.35)" }]}>
               <View style={styles.heroContent}>
-                <ThemedText style={styles.heroTitle}>
+                <ThemedText style={[styles.heroTitle, { color: isDark ? "#B0B0BE" : "#ded6e2fc" }]}>
                   {isMr
                     ? "योग्य जोडीदार\nआपल्याच समाजात"
                     : "Find Your Perfect Match\nWithin Our Community"}
                 </ThemedText>
-                <ThemedText style={styles.heroSub}>
+                <ThemedText style={[styles.heroSub, { color: isDark ? "#B0B0BE" : "#ded6e2fc" }]}>
                   {isMr
                     ? "फक्त वासुदेव समाजासाठी"
                     : "Exclusively for the Vasudev community"}
@@ -610,20 +650,26 @@ export default function HomeScreen() {
                         </ThemedText>
                       </TouchableOpacity>
                       <TouchableOpacity
-                        style={styles.heroSecondary}
+                        style={[styles.heroSecondary, { 
+                          borderColor: isDark ? "rgba(255,255,255,0.22)" : "rgba(0,0,0,0.2)",
+                          backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)"
+                        }]}
                         onPress={handleExploreAction}
                       >
-                        <ThemedText style={styles.heroSecondaryText}>
+                        <ThemedText style={[styles.heroSecondaryText, { color: isDark ? WHITE : "#ded6e2fc" }]}>
                           {isMr ? "शोधा" : "Explore"}
                         </ThemedText>
                       </TouchableOpacity>
                     </>
                   ) : (
                     <TouchableOpacity
-                      style={styles.heroSecondary}
+                      style={[styles.heroSecondary, { 
+                        borderColor: isDark ? "rgba(255,255,255,0.22)" : "rgba(0,0,0,0.2)",
+                        backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)"
+                      }]}
                       onPress={handleExploreAction}
                     >
-                      <ThemedText style={styles.heroSecondaryText}>
+                      <ThemedText style={[styles.heroSecondaryText, { color: isDark ? WHITE : "#111827" }]}>
                         {isMr ? "शोधा" : "Explore Profiles"}
                       </ThemedText>
                     </TouchableOpacity>
@@ -676,7 +722,7 @@ export default function HomeScreen() {
                       isMr ? 'प्रोफाइल अपूर्ण आहे' : 'Profile Incomplete',
                       isMr ? 'कृपया प्रथम तुमची प्रोफाइल तयार करा.' : 'Please create your profile first.'
                     );
-                    router.push('/edit-profile');
+                    navigateSafe('/edit-profile');
                     return;
                   }
                   Alert.alert(
@@ -695,14 +741,14 @@ export default function HomeScreen() {
                       isMr ? 'प्रोफाइल अपूर्ण आहे' : 'Profile Incomplete',
                       isMr ? 'कृपया प्रथम तुमची प्रोफाइल तयार करा.' : 'Please create your profile first.'
                     );
-                    router.push('/edit-profile');
+                    navigateSafe('/edit-profile');
                     return;
                   }
-                  router.push({
+                  navigateSafe({
                     pathname: "/profile",
                     params: {
                       view: "other",
-                      profileId: String(profile.id),
+                      profileId: String(profile.userId),
                       name: profile.fullName,
                       age: String(age),
                       role: profile.profession || "Not set",
@@ -726,7 +772,7 @@ export default function HomeScreen() {
                     key={profile.id}
                     activeOpacity={0.9}
                     onPress={handleCardPress}
-                    style={[styles.card, styles.profileCard]}
+                    style={[styles.card, styles.profileCard, { backgroundColor: colors.card, borderColor: colors.border }]}
                   >
                     <ImageBackground
                       source={{ uri: imageUrl }}
@@ -748,8 +794,8 @@ export default function HomeScreen() {
             {/* Explore All Profiles Card */}
             <TouchableOpacity
               activeOpacity={0.8}
-              onPress={() => router.push("/explore")}
-              style={[styles.card, styles.profileCard, styles.exploreProfilesCard]}
+              onPress={() => navigateSafe("/explore")}
+              style={[styles.card, styles.profileCard, styles.exploreProfilesCard, { backgroundColor: colors.card, borderColor: colors.border }]}
             >
               <View style={styles.exploreCirclePink}>
                 <Feather name="arrow-right" size={24} color="#FF4D8D" />
@@ -768,7 +814,7 @@ export default function HomeScreen() {
         </View>
 
         {/* ── CTA Banner ── */}
-        <View style={styles.ctaBanner}>
+        <View style={[styles.ctaBanner, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <ThemedText style={styles.ctaEmoji}>🦚</ThemedText>
           <ThemedText style={styles.ctaTitle}>
             {isMr ? "आजच सुरुवात करा" : "Start Your Journey Today"}
@@ -843,10 +889,9 @@ export default function HomeScreen() {
         </View>
 
         {/* ── Footer ── */}
-        <View style={styles.footer}>
+        <View style={[styles.footer, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
           <ThemedText style={styles.footerLabel}>Powered by</ThemedText>
           <ThemedText style={styles.footerCompany}>DHRUVEXA</ThemedText>
-          <ThemedText style={styles.footerText}>TECHNOLOGIES</ThemedText>
         </View>
       </Animated.ScrollView>
 
@@ -971,7 +1016,7 @@ const styles = StyleSheet.create({
   // Section
   section: { marginTop: 36, paddingHorizontal: 18 },
   sectionHeading: { marginBottom: 18 },
-  sectionTitle: { color: WHITE, fontSize: 22, fontWeight: "900" },
+  sectionTitle: { fontSize: 22, fontWeight: "900" },
   sectionLine: {
     width: 40,
     height: 3,
@@ -1071,8 +1116,8 @@ const styles = StyleSheet.create({
   },
   activeText: { color: WHITE, fontSize: 11 },
   profileBody: { padding: 18 },
-  profileName: { color: WHITE, fontSize: 20, fontWeight: "800" },
-  profileRole: { color: "#C0C0CC", marginTop: 4, fontSize: 13 },
+  profileName: { fontSize: 20, fontWeight: "800" },
+  profileRole: { marginTop: 4, fontSize: 13 },
   profileCity: { color: MUTED, marginTop: 3, fontSize: 12, marginBottom: 14 },
 
   // Shared pink button
@@ -1112,8 +1157,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   stepEmoji: { fontSize: 26 },
-  stepTitle: { color: WHITE, fontWeight: "800", fontSize: 15 },
-  stepDesc: { color: "#C0C0CC", fontSize: 13, lineHeight: 19, marginTop: 4 },
+  stepTitle: { fontWeight: "800", fontSize: 15 },
+  stepDesc: { fontSize: 13, lineHeight: 19, marginTop: 4 },
 
   // Events
   eventCard: { width: SW * 0.78 },
@@ -1132,8 +1177,8 @@ const styles = StyleSheet.create({
   eventTagText: { fontSize: 11, fontWeight: "700" },
   eventEmoji: { fontSize: 28 },
   eventDate: { color: MUTED, fontSize: 12, marginBottom: 6 },
-  eventTitle: { color: WHITE, fontSize: 18, fontWeight: "900" },
-  eventDesc: { color: "#C0C0CC", fontSize: 13, marginTop: 6, lineHeight: 19 },
+  eventTitle: { fontSize: 18, fontWeight: "900" },
+  eventDesc: { fontSize: 13, marginTop: 6, lineHeight: 19 },
 
   // Testimonials
   testimonialTop: { flexDirection: "row", gap: 14, marginBottom: 14 },
@@ -1150,7 +1195,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   testimonialMeta: { flex: 1, justifyContent: "center" },
-  testimonialCouple: { color: WHITE, fontSize: 16, fontWeight: "800" },
+  testimonialCouple: { fontSize: 16, fontWeight: "800" },
   testimonialCity: { color: PINK, fontSize: 12, marginTop: 3 },
   testimonialMarried: {
     color: "#3BFF87",
@@ -1159,7 +1204,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   testimonialQuote: {
-    color: "#D0D0DC",
     fontSize: 14,
     lineHeight: 22,
     fontStyle: "italic",
@@ -1176,7 +1220,6 @@ const styles = StyleSheet.create({
   },
   ctaEmoji: { fontSize: 44, marginBottom: 12 },
   ctaTitle: {
-    color: WHITE,
     fontSize: 26,
     fontWeight: "900",
     textAlign: "center",

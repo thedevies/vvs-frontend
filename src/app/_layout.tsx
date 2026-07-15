@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { LanguageProvider } from '@/context/LanguageContext';
 
 import CustomAlertRenderer from '@/components/ui/CustomAlertRenderer';
+import { ThemeProvider as AppThemeProvider, useAppTheme } from '@/context/ThemeContext';
 
 function RootLayoutNav() {
   const { isAuthenticated, isLoading, profileCompleted } = useAuth();
@@ -34,14 +35,15 @@ function RootLayoutNav() {
   }, [isAuthenticated, isLoading, segments, profileCompleted]);
 
   const colorScheme = useColorScheme();
-
+  const { colors } = useAppTheme();
+ 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack
         screenOptions={{
           headerShown: false,
           animation: 'slide_from_right',
-          contentStyle: { backgroundColor: '#0F0F12' },
+          contentStyle: { backgroundColor: colors.background },
         }}>
         <Stack.Screen name="(app)"  options={{ headerShown: false }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
@@ -53,10 +55,12 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   return (
-    <LanguageProvider>
-      <AuthProvider>
-        <RootLayoutNav />
-      </AuthProvider>
-    </LanguageProvider>
+    <AppThemeProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <RootLayoutNav />
+        </AuthProvider>
+      </LanguageProvider>
+    </AppThemeProvider>
   );
 }

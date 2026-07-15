@@ -109,7 +109,7 @@ export default function SearchScreen() {
           const age = getAge(userObj.dateOfBirth);
           const imageUrl = getPhotoUrl(userObj.profilePhoto);
           return {
-            id: userObj.id,
+            id: userObj.userId,
             name: userObj.fullName || 'Member',
             age: age,
             role: userObj.profession || 'Not set',

@@ -19,6 +19,7 @@ import { ThemedText } from '@/components/themed-text';
 import { useAuth } from '@/context/AuthContext';
 import { profileApi, BASE_URL } from '@/utils/api';
 import type { UserProfile } from '@/utils/types';
+import { useAppTheme } from '@/context/ThemeContext';
 
 type ViewMode = 'connections' | 'others';
 
@@ -27,6 +28,17 @@ const MAX_AGE_LIMIT = 45;
 
 export default function ExploreScreen() {
   const { profileCompleted, user } = useAuth();
+  const { colors, isDark } = useAppTheme();
+  const styles = getStyles(colors);
+  const isNavigating = React.useRef(false);
+  const navigateSafe = (route: any) => {
+    if (isNavigating.current) return;
+    isNavigating.current = true;
+    setTimeout(() => {
+      isNavigating.current = false;
+    }, 1000);
+    router.push(route);
+  };
   const [viewMode, setViewMode] = useState<ViewMode>('others');
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchText, setSearchText] = useState('');
@@ -202,10 +214,10 @@ export default function ExploreScreen() {
           <ThemedText style={styles.headerTitle}>Discover Profiles</ThemedText>
           <View style={styles.headerActions}>
             <TouchableOpacity style={styles.iconButton} onPress={() => setSearchOpen((prev) => !prev)}>
-              <Feather name="search" size={20} color={searchOpen ? "#FF4D8D" : "#fff"} />
+              <Feather name="search" size={20} color={searchOpen ? "#FF4D8D" : colors.text} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.iconButton} onPress={() => setFiltersOpen((prev) => !prev)}>
-              <Feather name="sliders" size={20} color={filtersOpen ? "#FF4D8D" : "#fff"} />
+              <Feather name="sliders" size={20} color={filtersOpen ? "#FF4D8D" : colors.text} />
             </TouchableOpacity>
           </View>
         </View>
@@ -368,14 +380,14 @@ export default function ExploreScreen() {
                             'Profile Incomplete',
                             'Please complete your profile to view other member details and send interest requests.'
                           );
-                          router.push('/edit-profile');
+                          navigateSafe('/edit-profile');
                           return;
                         }
-                        router.push({
+                        navigateSafe({
                           pathname: '/profile',
                           params: {
                             view: 'other',
-                            profileId: String(profile.id),
+                            profileId: String(profile.userId),
                             name: profile.fullName,
                             age: String(age),
                             role: profile.profession || 'Not set',
@@ -393,13 +405,18 @@ export default function ExploreScreen() {
                           },
                         });
                       }}>
-                      <Image source={{ uri: imageUrl }} style={styles.avatar} />
+                      <Image source={{ uri: imageUrl }} style={[styles.avatar, { borderWidth: 1.5, borderColor: '#FF4D8D' }]} />
                       <View style={styles.profileMeta}>
                         <View style={styles.nameRow}>
                           <ThemedText style={styles.nameText}>{profile.fullName}</ThemedText>
                         </View>
                         <ThemedText style={styles.roleText}>{profile.profession || 'Not set'}</ThemedText>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 }}>
+                          <ThemedText style={{ color: colors.muted, fontSize: 12 }}>🎂 {age} yrs</ThemedText>
+                          <ThemedText style={{ color: colors.muted, fontSize: 12 }}>📍 {profile.city || 'Not set'}</ThemedText>
+                        </View>
                       </View>
+                      <Feather name="chevron-right" size={20} color={colors.muted} style={{ marginRight: 4 }} />
                     </TouchableOpacity>
                   );
                 })}
@@ -427,8 +444,8 @@ export default function ExploreScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  mainContainer: { flex: 1, backgroundColor: '#0F0F12' },
+const getStyles = (colors: any) => StyleSheet.create({
+  mainContainer: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1 },
   header: {
     flexDirection: 'row',
@@ -437,98 +454,90 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
   },
-  headerTitle: { color: '#fff', fontSize: 30, fontWeight: '800' },
+  headerTitle: { color: colors.text, fontSize: 30, fontWeight: '800' },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   iconButton: {
     width: 42,
     height: 42,
     borderRadius: 12,
-    backgroundColor: '#17171C',
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
   searchWrap: {
-    marginHorizontal: 20,
-    marginBottom: 10,
-    backgroundColor: '#17171C',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    paddingHorizontal: 12,
-    height: 48,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-  },
-  searchInput: { flex: 1, color: '#fff', fontSize: 14 },
-  resultRow: { marginHorizontal: 20, marginBottom: 8, flexDirection: 'row', justifyContent: 'flex-end' },
-  appliedFiltersRow: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    paddingHorizontal: 12,
     marginHorizontal: 20,
+    height: 44,
+    gap: 8,
     marginBottom: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  searchInput: { flex: 1, color: colors.text, fontSize: 14 },
+  resultRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginTop: 6,
+    marginBottom: 10,
   },
-  appliedFiltersTag: {
-    backgroundColor: 'rgba(255,77,141,0.15)',
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(255,77,141,0.4)',
+  resultPill: {
     paddingHorizontal: 12,
     paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: colors.card2,
   },
-  appliedFiltersText: { color: '#FF4D8D', fontSize: 12, fontWeight: '700' },
+  resultPillText: { color: '#FF4D8D', fontSize: 12, fontWeight: '700' },
+  appliedFiltersRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  appliedFiltersTag: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255, 77, 141, 0.1)',
+  },
+  appliedFiltersText: { color: '#FF4D8D', fontSize: 11, fontWeight: '700' },
   clearFiltersButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#17171C',
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    gap: 4,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 5,
+    borderRadius: 6,
+    backgroundColor: colors.card2,
   },
-  clearFiltersText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  resultPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(255,77,141,0.4)',
-    backgroundColor: 'rgba(255,77,141,0.15)',
-  },
-  resultPillText: { color: '#FF4D8D', fontSize: 12, fontWeight: '700' },
-  modeRow: { flexDirection: 'row', marginHorizontal: 20, marginBottom: 12, gap: 10 },
-  modeButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 14,
-    backgroundColor: '#17171C',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    alignItems: 'center',
-  },
-  modeButtonActive: { backgroundColor: '#FF4D8D', borderColor: '#FF4D8D' },
-  modeButtonText: { color: '#9B9BA1', fontWeight: '600' },
-  modeButtonTextActive: { color: '#fff' },
+  clearFiltersText: { color: colors.text, fontSize: 11, fontWeight: '700', opacity: 0.9 },
   filtersAndList: { flex: 1 },
-  lockedPageWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 28 },
-  lockedIconWrap: {
+  lockedView: {
+    paddingHorizontal: 40,
+    paddingVertical: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lockedCircle: {
     width: 68,
     height: 68,
     borderRadius: 34,
-    backgroundColor: '#2A2A2F',
+    backgroundColor: colors.card2,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
   },
-  lockedTitle: { color: '#fff', fontSize: 22, fontWeight: '800' },
-  lockedBody: { color: '#B0B0B5', fontSize: 14, textAlign: 'center', lineHeight: 21, marginTop: 8 },
+  lockedTitle: { color: colors.text, fontSize: 22, fontWeight: '800' },
+  lockedBody: { color: colors.muted, fontSize: 14, textAlign: 'center', lineHeight: 21, marginTop: 8 },
   unlockButton: {
     marginTop: 18,
     backgroundColor: '#FF4D8D',
@@ -540,10 +549,10 @@ const styles = StyleSheet.create({
   filtersCard: {
     marginTop: 14,
     marginHorizontal: 20,
-    backgroundColor: '#17171C',
+    backgroundColor: colors.card,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.border,
     overflow: 'hidden',
   },
   filterHeaderRow: {
@@ -553,50 +562,50 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
+    borderBottomColor: colors.border,
   },
-  filterHeaderText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  filterHeaderText: { color: colors.text, fontSize: 15, fontWeight: '700' },
   filterSectionBody: { paddingHorizontal: 12, paddingBottom: 14, paddingTop: 4 },
   filterRow: { gap: 10 },
   filterChip: {
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: '#17171C',
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.border,
   },
   filterChipActive: { backgroundColor: '#FF4D8D', borderColor: '#FF4D8D' },
-  filterChipText: { color: '#9B9BA1', fontWeight: '600' },
+  filterChipText: { color: colors.muted, fontWeight: '600' },
   filterChipTextActive: { color: '#fff' },
   ageCard: {
-    backgroundColor: '#17171C',
+    backgroundColor: colors.card,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.border,
     padding: 14,
     flexDirection: 'row',
     gap: 12,
   },
   ageControlColumn: { flex: 1, alignItems: 'center', gap: 10 },
-  ageLabel: { color: '#9B9BA1', fontSize: 12 },
+  ageLabel: { color: colors.muted, fontSize: 12 },
   ageControlRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   ageControlButton: {
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: '#0F0F12',
+    backgroundColor: colors.background,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  ageValue: { color: '#fff', fontSize: 18, fontWeight: '700', minWidth: 28, textAlign: 'center' },
+  ageValue: { color: colors.text, fontSize: 18, fontWeight: '700', minWidth: 28, textAlign: 'center' },
   cityInputWrap: {
-    backgroundColor: '#0F0F12',
+    backgroundColor: colors.background,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.border,
     paddingHorizontal: 10,
     height: 44,
     flexDirection: 'row',
@@ -604,26 +613,26 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 10,
   },
-  cityInput: { flex: 1, color: '#fff', fontSize: 14 },
+  cityInput: { flex: 1, color: colors.text, fontSize: 14 },
   listSection: { marginTop: 18, paddingHorizontal: 20, gap: 12 },
   emptyCard: {
-    backgroundColor: '#17171C',
+    backgroundColor: colors.card,
     borderRadius: 18,
     padding: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.border,
   },
-  emptyTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  emptyBody: { color: '#9B9BA1', marginTop: 8, lineHeight: 20 },
+  emptyTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
+  emptyBody: { color: colors.muted, marginTop: 8, lineHeight: 20 },
   profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: '#17171C',
+    backgroundColor: colors.card,
     borderRadius: 14,
     padding: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: colors.border,
   },
   avatar: {
     width: 50,
@@ -640,19 +649,19 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   nameText: {
-    color: '#fff',
+    color: colors.text,
     fontSize: 16,
     fontWeight: '700',
   },
   roleText: {
-    color: '#9B9BA1',
+    color: colors.muted,
     fontSize: 13,
   },
   loadMoreButton: {
-    backgroundColor: '#17171C',
+    backgroundColor: colors.card,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: colors.border,
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',

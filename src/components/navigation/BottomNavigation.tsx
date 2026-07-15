@@ -1,8 +1,8 @@
 import { useAuth } from "@/context/AuthContext";
 import { ThemedText } from "@/components/themed-text";
 import { Feather } from "@expo/vector-icons";
-import { router, usePathname } from "expo-router";
-import { StyleSheet, TouchableOpacity, View, Platform, Image, ActivityIndicator } from "react-native";
+import { router, usePathname, useLocalSearchParams } from "expo-router";
+import { StyleSheet, TouchableOpacity, View, Platform, Image, ActivityIndicator, Animated } from "react-native";
 import { useEffect, useState } from "react";
 import AuthModal from "@/components/ui/AuthModal";
 import { BASE_URL, profileApi } from "@/utils/api";
@@ -10,14 +10,18 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import { CustomAlert as Alert } from "@/utils/alert";
 import { eventEmitter } from "@/utils/events";
+import { useAppTheme } from "@/context/ThemeContext";
 
 type BottomNavigationProps = {
   activeRouteOverride?: string;
+  containerStyle?: any;
 };
 
-export default function BottomNavigation({ activeRouteOverride }: BottomNavigationProps) {
+export default function BottomNavigation({ activeRouteOverride, containerStyle }: BottomNavigationProps) {
   const pathname = usePathname();
+  const params = useLocalSearchParams();
   const { isAuthenticated, profileCompleted, user } = useAuth();
+  const { colors, isDark } = useAppTheme();
   const [showLockedWarning, setShowLockedWarning] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const insets = useSafeAreaInsets();
@@ -123,6 +127,10 @@ export default function BottomNavigation({ activeRouteOverride }: BottomNavigati
       return;
     }
     const route = (tab as any).route;
+    const isViewingOtherProfile = pathname === '/profile' && params.view === 'other';
+    if (route === pathname && !isViewingOtherProfile) return;
+    if (route === '/profile' && pathname === '/edit-profile') return;
+
     if (!isAuthenticated) {
       if (route === "/" || route === "/explore") {
         router.push(route as any);
@@ -166,7 +174,11 @@ export default function BottomNavigation({ activeRouteOverride }: BottomNavigati
         </View>
       )}
 
-      <View style={[styles.container, { paddingBottom: bottomPadding }]}>
+      <Animated.View style={[styles.container, { 
+        paddingBottom: bottomPadding,
+        backgroundColor: colors.card,
+        borderTopColor: colors.border,
+      }, containerStyle]}>
       {tabs.map((tab, index) => {
         const active = 'route' in tab && (activeRouteOverride ?? pathname) === tab.route;
         const ownPhoto = user?.profile?.profilePhoto;
@@ -182,7 +194,7 @@ export default function BottomNavigation({ activeRouteOverride }: BottomNavigati
                 source={{ uri: getPhotoUrl(ownPhoto) }}
                 style={[
                   styles.profileAvatar,
-                  { borderColor: active ? "#FF4D8D" : "rgba(255,255,255,0.18)" }
+                  { borderColor: active ? "#FF4D8D" : colors.border }
                 ]}
               />
             ) : 'action' in tab && tab.action === 'upload' && uploading ? (
@@ -197,7 +209,7 @@ export default function BottomNavigation({ activeRouteOverride }: BottomNavigati
           </TouchableOpacity>
         );
       })}
-      </View>
+      </Animated.View>
     </>
   );
 }

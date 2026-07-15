@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Alert, Platform } from 'react-native';
 import * as Device from 'expo-device';
+import * as SecureStore from 'expo-secure-store';
 import { storage } from '@/utils/storage';
-import { authApi, profileApi, BASE_URL, setCachedToken, registerSessionExpiredCallback } from '@/utils/api';
+import { authApi, profileApi, BASE_URL, setCachedToken, registerSessionExpiredCallback, notificationApi } from '@/utils/api';
 import type { User } from '@/utils/types';
 
 type AuthContextType = {
@@ -42,6 +43,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const syncDeviceTokenWithBackend = async () => {
+    try {
+      const fcmToken = await SecureStore.getItemAsync('vvs_fcm_token');
+      if (!fcmToken) {
+        console.log('[Push] No stored FCM token to sync.');
+        return;
+      }
+
+      const deviceId = getDeviceId();
+      const platform = Platform.OS === 'ios' ? 'IOS' : 'ANDROID';
+
+      console.log('[Push] Registering device with backend...', { deviceId, fcmToken, platform });
+      const response = await notificationApi.registerDevice({
+        deviceId,
+        fcmToken,
+        platform,
+      });
+      console.log('[Push] Device registered successfully:', response.message);
+    } catch (err: any) {
+      console.warn('[Push] Failed to register device with backend:', err.message);
+    }
+  };
+
   const profileCompleted = !!(user?.profile);
 
   // On mount: check for saved tokens and validate
@@ -75,6 +99,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsAuthenticated(true);
         await storage.saveUserData(response.data);
         console.log('[Auth] Token valid, user:', response.data.mobile);
+
+        // Sync device token
+        syncDeviceTokenWithBackend();
       }
     } catch (error: any) {
       console.log('[Auth] Token validation failed:', error.message);
@@ -186,6 +213,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       
       setIsAuthenticated(true);
+
+      // Sync device token
+      syncDeviceTokenWithBackend();
 
       return { success: true };
     } catch (error: any) {

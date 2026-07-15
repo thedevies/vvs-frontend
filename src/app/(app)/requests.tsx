@@ -8,33 +8,64 @@ import {
     TouchableOpacity,
     View,
     ActivityIndicator,
+    Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import BottomNavigation from "@/components/navigation/BottomNavigation";
 import { ThemedText } from "@/components/themed-text";
 import { interestApi, BASE_URL } from "@/utils/api";
+import { useAppTheme } from "@/context/ThemeContext";
 
 export default function RequestsScreen() {
+  const { colors, isDark } = useAppTheme();
+  const styles = getStyles(colors);
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   const [notifications, setNotifications] = useState<any[]>([
     {
       id: "notif1",
-      title: "New Match Found",
-      description: "Check out new profiles matching your preferences.",
+      title: "New Connection Request",
+      description: "Sneha Patil has sent you an interest request.",
       icon: "heart",
-      time: "Just now",
+      type: "interests",
+      time: "5m ago",
     },
     {
       id: "notif2",
       title: "Complete Your Profile",
       description: "Add bio details to get 3x more visibility.",
       icon: "user",
+      type: "system",
       time: "1d ago",
+    },
+    {
+      id: "notif3",
+      title: "Request Accepted 🎉",
+      description: "Rahul Shinde accepted your interest request.",
+      icon: "check-circle",
+      type: "interests",
+      time: "2h ago",
+    },
+    {
+      id: "notif4",
+      title: "Account Security Update",
+      description: "Your login session from vivo device was registered.",
+      icon: "shield",
+      type: "system",
+      time: "3d ago",
     }
   ]);
+
+  const [activeFilter, setActiveFilter] = useState<'all' | 'interests' | 'system'>('all');
+  const [selectedSection, setSelectedSection] = useState<'requests' | 'activity'>('requests');
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  const filteredNotifications = notifications.filter((n) => {
+    if (activeFilter === 'all') return true;
+    return n.type === activeFilter;
+  });
 
   useEffect(() => {
     fetchReceivedInterests();
@@ -124,115 +155,182 @@ export default function RequestsScreen() {
     <View style={styles.mainContainer}>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <ThemedText style={styles.headerTitle}>
-            Activity
-          </ThemedText>
+          <TouchableOpacity style={styles.dropdownBtn} onPress={() => setShowDropdown(true)}>
+            <ThemedText style={styles.headerTitle}>
+              {selectedSection === 'requests' ? 'Connection Requests' : 'Recent Activity'}
+            </ThemedText>
+            <Feather name="chevron-down" size={20} color={colors.text} style={styles.dropdownChevron} />
+          </TouchableOpacity>
         </View>
 
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContainer}
         >
-          {loading ? (
-            <ActivityIndicator size="large" color="#FF4D8D" style={{ marginVertical: 32 }} />
-          ) : (
-            <>
-              {requests.length > 0 ? (
-                <View style={styles.sectionContainer}>
-                  <ThemedText style={styles.sectionHeader}>Connection Requests</ThemedText>
-                  <View style={styles.requestsList}>
-                    {requests.map((request) => (
-                      <View key={request.id} style={styles.requestCard}>
-                        <Image source={{ uri: request.image }} style={styles.requestAvatar} />
-                        <View style={styles.requestContent}>
-                          <ThemedText style={styles.requestText}>
-                            <ThemedText style={styles.boldText}>{request.name}</ThemedText> • {request.role}
-                          </ThemedText>
-                          <ThemedText style={styles.requestTimeText}>{request.time} • {request.city}</ThemedText>
-                          
-                          <View style={styles.requestActionRow}>
-                            <TouchableOpacity 
-                              style={styles.miniAcceptBtn}
-                              onPress={() => handleAcceptRequest(request.name, request.id)}
-                            >
-                              <ThemedText style={styles.miniBtnText}>Accept</ThemedText>
-                            </TouchableOpacity>
-                            <TouchableOpacity 
-                              style={styles.miniDeclineBtn}
-                              onPress={() => handleDeclineRequest(request.id)}
-                            >
-                              <ThemedText style={styles.miniBtnTextDecline}>Decline</ThemedText>
-                            </TouchableOpacity>
+          {selectedSection === 'requests' ? (
+            loading ? (
+              <ActivityIndicator size="large" color="#FF4D8D" style={{ marginVertical: 32 }} />
+            ) : (
+              <>
+                {requests.length > 0 ? (
+                  <View style={styles.sectionContainer}>
+                    <View style={styles.requestsList}>
+                      {requests.map((request) => (
+                        <View key={request.id} style={styles.requestCard}>
+                          <Image source={{ uri: request.image }} style={styles.requestAvatar} />
+                          <View style={styles.requestContent}>
+                            <ThemedText style={styles.requestText}>
+                              <ThemedText style={styles.boldText}>{request.name}</ThemedText> • {request.role}
+                            </ThemedText>
+                            <ThemedText style={styles.requestTimeText}>{request.time} • {request.city}</ThemedText>
+                            
+                            <View style={styles.requestActionRow}>
+                              <TouchableOpacity 
+                                style={styles.miniAcceptBtn}
+                                onPress={() => handleAcceptRequest(request.name, request.id)}
+                              >
+                                <ThemedText style={styles.miniBtnText}>Accept</ThemedText>
+                              </TouchableOpacity>
+                              <TouchableOpacity 
+                                style={styles.miniDeclineBtn}
+                                onPress={() => handleDeclineRequest(request.id)}
+                              >
+                                <ThemedText style={styles.miniBtnTextDecline}>Decline</ThemedText>
+                              </TouchableOpacity>
+                            </View>
                           </View>
                         </View>
-                      </View>
-                    ))}
+                      ))}
+                    </View>
                   </View>
+                ) : (
+                  <View style={styles.sectionContainer}>
+                    <View style={styles.emptyState}>
+                      <ThemedText style={styles.emptyText}>No pending requests</ThemedText>
+                    </View>
+                  </View>
+                )}
+              </>
+            )
+          ) : (
+            /* Recent Activity / Notifications Section */
+            <View style={styles.sectionContainer}>
+              {/* Filter Chips */}
+              <View style={styles.filterContainer}>
+                <TouchableOpacity 
+                  style={[styles.filterChip, activeFilter === 'all' && styles.filterChipActive]} 
+                  onPress={() => setActiveFilter('all')}
+                >
+                  <ThemedText style={[styles.filterChipText, activeFilter === 'all' && styles.filterChipTextActive]}>
+                    All
+                  </ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.filterChip, activeFilter === 'interests' && styles.filterChipActive]} 
+                  onPress={() => setActiveFilter('interests')}
+                >
+                  <ThemedText style={[styles.filterChipText, activeFilter === 'interests' && styles.filterChipTextActive]}>
+                    Interests
+                  </ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.filterChip, activeFilter === 'system' && styles.filterChipActive]} 
+                  onPress={() => setActiveFilter('system')}
+                >
+                  <ThemedText style={[styles.filterChipText, activeFilter === 'system' && styles.filterChipTextActive]}>
+                    System
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+
+              {filteredNotifications.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <ThemedText style={styles.emptyText}>
+                    No notifications in this category
+                  </ThemedText>
                 </View>
               ) : (
-                <View style={styles.sectionContainer}>
-                  <ThemedText style={styles.sectionHeader}>Connection Requests</ThemedText>
-                  <View style={styles.emptyState}>
-                    <ThemedText style={styles.emptyText}>No pending requests</ThemedText>
-                  </View>
+                <View style={styles.notificationsList}>
+                  {filteredNotifications.map((notification) => (
+                    <View key={notification.id} style={styles.notificationCard}>
+                      <View style={styles.notificationIcon}>
+                        <Feather
+                          name={notification.icon as any}
+                          size={16}
+                          color="#FF4D8D"
+                        />
+                      </View>
+                      <View style={styles.notificationInfo}>
+                        <ThemedText style={styles.notificationTitle}>
+                          {notification.title}
+                        </ThemedText>
+                        <ThemedText style={styles.notificationDescription}>
+                          {notification.description}
+                        </ThemedText>
+                        <ThemedText style={styles.notificationTime}>
+                          {notification.time}
+                        </ThemedText>
+                      </View>
+                      <TouchableOpacity 
+                        style={styles.closeButton}
+                        onPress={() => handleDismissNotification(notification.id)}
+                      >
+                        <Feather name="x" size={14} color="#555" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
                 </View>
               )}
-            </>
+            </View>
           )}
-
-          {/* Activity / Notifications Section */}
-          <View style={[styles.sectionContainer, { marginTop: requests.length > 0 ? 24 : 0 }]}>
-            <ThemedText style={styles.sectionHeader}>Recent Activity</ThemedText>
-            {notifications.length === 0 ? (
-              <View style={styles.emptyState}>
-                <ThemedText style={styles.emptyText}>
-                  No new notifications
-                </ThemedText>
-              </View>
-            ) : (
-              <View style={styles.notificationsList}>
-                {notifications.map((notification) => (
-                  <View key={notification.id} style={styles.notificationCard}>
-                    <View style={styles.notificationIcon}>
-                      <Feather
-                        name={notification.icon as any}
-                        size={16}
-                        color="#FF4D8D"
-                      />
-                    </View>
-                    <View style={styles.notificationInfo}>
-                      <ThemedText style={styles.notificationTitle}>
-                        {notification.title}
-                      </ThemedText>
-                      <ThemedText style={styles.notificationDescription}>
-                        {notification.description}
-                      </ThemedText>
-                      <ThemedText style={styles.notificationTime}>
-                        {notification.time}
-                      </ThemedText>
-                    </View>
-                    <TouchableOpacity 
-                      style={styles.closeButton}
-                      onPress={() => handleDismissNotification(notification.id)}
-                    >
-                      <Feather name="x" size={14} color="#555" />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
         </ScrollView>
       </SafeAreaView>
       <BottomNavigation />
+
+      {/* Dropdown Menu Modal */}
+      <Modal visible={showDropdown} transparent animationType="fade">
+        <TouchableOpacity 
+          style={styles.dropdownOverlay} 
+          activeOpacity={1} 
+          onPress={() => setShowDropdown(false)}
+        >
+          <View style={[styles.dropdownMenu, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <TouchableOpacity 
+              style={[styles.dropdownItem, selectedSection === 'requests' && { backgroundColor: 'rgba(255, 77, 141, 0.08)' }]} 
+              onPress={() => {
+                setSelectedSection('requests');
+                setShowDropdown(false);
+              }}
+            >
+              <Feather name="users" size={16} color={selectedSection === 'requests' ? '#FF4D8D' : colors.text} />
+              <ThemedText style={[styles.dropdownItemText, selectedSection === 'requests' && { color: '#FF4D8D', fontWeight: '700' }]}>
+                Connection Requests
+              </ThemedText>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.dropdownItem, selectedSection === 'activity' && { backgroundColor: 'rgba(255, 77, 141, 0.08)' }]} 
+              onPress={() => {
+                setSelectedSection('activity');
+                setShowDropdown(false);
+              }}
+            >
+              <Feather name="bell" size={16} color={selectedSection === 'activity' ? '#FF4D8D' : colors.text} />
+              <ThemedText style={[styles.dropdownItemText, selectedSection === 'activity' && { color: '#FF4D8D', fontWeight: '700' }]}>
+                Recent Activity
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   mainContainer: {
     flex: 1,
-    backgroundColor: "#0F0F12",
+    backgroundColor: colors.background,
   },
   container: {
     flex: 1,
@@ -242,23 +340,58 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 16,
-    gap: 12,
+  },
+  dropdownBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  dropdownChevron: {
+    marginTop: 4,
   },
   headerTitle: {
-    flex: 1,
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: "800",
-    color: "#fff",
+  },
+  dropdownOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    top: 100,
+    left: 20,
+    right: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    gap: 12,
+  },
+  dropdownItemText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   iconButton: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: "#17171C",
+    backgroundColor: colors.card,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
+    borderColor: colors.border,
   },
   sectionContainer: {
     gap: 12,
@@ -266,7 +399,6 @@ const styles = StyleSheet.create({
   sectionHeader: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#fff",
     marginBottom: 6,
   },
   scrollContainer: {
@@ -279,10 +411,12 @@ const styles = StyleSheet.create({
   requestCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#17171C",
+    backgroundColor: colors.card,
     borderRadius: 20,
     padding: 16,
     gap: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   requestAvatar: {
     width: 56,
@@ -294,7 +428,6 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   requestText: {
-    color: '#fff',
     fontSize: 14,
     lineHeight: 18,
   },
@@ -302,7 +435,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   requestTimeText: {
-    color: '#8B8B91',
+    color: colors.muted,
     fontSize: 11,
     marginTop: 4,
   },
@@ -325,9 +458,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   miniDeclineBtn: {
-    backgroundColor: '#26262D',
+    backgroundColor: colors.card2,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: colors.border,
     borderRadius: 8,
     paddingHorizontal: 16,
     height: 32,
@@ -335,7 +468,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   miniBtnTextDecline: {
-    color: '#aaa',
+    color: colors.muted,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -345,12 +478,12 @@ const styles = StyleSheet.create({
   notificationCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#131317",
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 12,
     gap: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.02)',
+    borderColor: colors.border,
   },
   notificationIcon: {
     width: 36,
@@ -364,18 +497,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   notificationTitle: {
-    color: "#fff",
     fontSize: 14,
     fontWeight: "700",
   },
   notificationDescription: {
-    color: "#8E8E95",
+    color: colors.muted,
     fontSize: 12,
     marginTop: 2,
     lineHeight: 16,
   },
   notificationTime: {
-    color: "#555",
+    color: colors.muted,
+    opacity: 0.7,
     fontSize: 10,
     marginTop: 4,
   },
@@ -387,7 +520,33 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
   },
   emptyText: {
-    color: "#9B9BA1",
+    color: colors.muted,
     fontSize: 16,
+  },
+  filterContainer: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 16,
+    paddingHorizontal: 2,
+  },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  filterChipActive: {
+    backgroundColor: "#FF4D8D",
+    borderColor: "#FF4D8D",
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.text === "#ffffff" ? "#9B9BA1" : "#66666F",
+  },
+  filterChipTextActive: {
+    color: "#fff",
   },
 });
