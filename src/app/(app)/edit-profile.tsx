@@ -663,62 +663,37 @@ export default function EditProfileScreen() {
               </View>
             </View>
 
-            {/* ── Matrimonial Biodata Card (Mandatory) ── */}
-            <View style={[styles.card, styles.biodataCard, { backgroundColor: colors.card, borderColor: hasBiodata ? 'rgba(59,182,115,0.35)' : colors.border }]}>
+            {/* ── Biodata Card ── */}
+            <View style={[styles.card, styles.biodataCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={styles.biodataPanelLeft}>
-                <View style={[styles.biodataIconWrapper, { backgroundColor: 'rgba(255,77,141,0.1)' }]}>
-                  <Ionicons name="document-text-outline" size={20} color={ACCENT} />
-                </View>
-                <View style={styles.biodataInfoTexts}>
-                  <ThemedText style={[styles.biodataPanelTitle, { color: colors.text }]}>Matrimonial Biodata *</ThemedText>
-                  <ThemedText style={[styles.biodataPanelStatus, { color: colors.textSecondary }]}>
-                    {hasBiodata ? (biodataObj?.isGenerated ? 'Compiled PDF Document' : 'Uploaded PDF Document') : 'No document added (mandatory)'}
-                  </ThemedText>
-                </View>
+                <ThemedText style={[styles.biodataPanelTitle, { color: colors.text, fontSize: 16, fontWeight: '700' }]}>Biodata</ThemedText>
               </View>
 
               <View style={styles.biodataPanelRight}>
-                {hasBiodata ? (
-                  <View style={styles.biodataActionIconsRow}>
-                    <TouchableOpacity
-                      style={[styles.biodataOutlineBtn, { backgroundColor: colors.card2 || colors.background, borderColor: '#3BB673' }]}
-                      onPress={handleViewBiodata}
-                    >
-                      <Ionicons name="eye-outline" size={16} color="#3BB673" />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.biodataOutlineBtn, { backgroundColor: colors.card2 || colors.background, borderColor: ACCENT }]}
-                      onPress={handleUpdateBiodata}
-                    >
-                      <Ionicons name="cloud-upload-outline" size={16} color={ACCENT} />
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <View style={styles.biodataPanelAddRow}>
-                    <TouchableOpacity
-                      style={[styles.biodataMiniBtn, { backgroundColor: colors.card2 || colors.background }]}
-                      onPress={handleUploadBiodata}
-                      disabled={uploadingBiodata}
-                    >
-                      {uploadingBiodata ? (
-                        <ActivityIndicator color={ACCENT} size="small" />
-                      ) : (
-                        <>
-                          <Ionicons name="cloud-upload-outline" size={12} color={ACCENT} />
-                          <ThemedText style={styles.biodataMiniBtnText}>Upload</ThemedText>
-                        </>
-                      )}
-                    </TouchableOpacity>
+                <View style={styles.biodataPanelAddRow}>
+                  <TouchableOpacity
+                    style={[styles.biodataMiniBtn, { backgroundColor: colors.card2 || colors.background }]}
+                    onPress={handleUploadBiodata}
+                    disabled={uploadingBiodata}
+                  >
+                    {uploadingBiodata ? (
+                      <ActivityIndicator color={ACCENT} size="small" />
+                    ) : (
+                      <>
+                        <Ionicons name="cloud-upload-outline" size={12} color={ACCENT} />
+                        <ThemedText style={styles.biodataMiniBtnText}>Upload</ThemedText>
+                      </>
+                    )}
+                  </TouchableOpacity>
 
-                    <TouchableOpacity
-                      style={[styles.biodataMiniBtn, styles.biodataMiniBtnPink]}
-                      onPress={() => setShowGenerateModal(true)}
-                    >
-                      <Ionicons name="sparkles-outline" size={12} color="#fff" />
-                      <ThemedText style={[styles.biodataMiniBtnText, { color: '#fff' }]}>Create</ThemedText>
-                    </TouchableOpacity>
-                  </View>
-                )}
+                  <TouchableOpacity
+                    style={[styles.biodataMiniBtn, styles.biodataMiniBtnPink]}
+                    onPress={() => setShowGenerateModal(true)}
+                  >
+                    <Ionicons name="sparkles-outline" size={12} color="#fff" />
+                    <ThemedText style={[styles.biodataMiniBtnText, { color: '#fff' }]}>Create</ThemedText>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
 

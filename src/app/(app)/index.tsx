@@ -542,7 +542,7 @@ export default function HomeScreen() {
 
   const handlePrimaryAction = () => {
     if (!isAuthenticated) {
-      setShowAuthModal(true);
+      navigateSafe("/(auth)/mobile");
       return;
     }
     if (profileCompleted) {
@@ -553,10 +553,6 @@ export default function HomeScreen() {
   };
 
   const handleExploreAction = () => {
-    if (!isAuthenticated) {
-      setShowAuthModal(true);
-      return;
-    }
     navigateSafe("/explore");
   };
 
@@ -714,7 +710,7 @@ export default function HomeScreen() {
 
                 const handleConnect = () => {
                   if (!isAuthenticated) {
-                    setShowAuthModal(true);
+                    navigateSafe("/(auth)/mobile");
                     return;
                   }
                   if (!profileCompleted) {
@@ -733,7 +729,7 @@ export default function HomeScreen() {
 
                 const handleCardPress = () => {
                   if (!isAuthenticated) {
-                    setShowAuthModal(true);
+                    navigateSafe("/(auth)/mobile");
                     return;
                   }
                   if (!profileCompleted) {

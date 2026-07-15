@@ -1003,7 +1003,7 @@ export default function ProfileScreen() {
                       <ThemedText
                         style={[styles.detailLabel, { color: colors.text }]}
                       >
-                        Matrimonial Biodata
+                        Biodata
                       </ThemedText>
                       <ThemedText
                         style={{
@@ -1046,7 +1046,7 @@ export default function ProfileScreen() {
                     <ThemedText
                       style={[styles.detailLabel, { color: colors.text }]}
                     >
-                      Matrimonial Biodata
+                      Biodata
                     </ThemedText>
                     <ThemedText
                       style={{
