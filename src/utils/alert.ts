@@ -4,6 +4,7 @@ type AlertConfig = {
   title: string;
   message: string;
   buttons?: AlertButton[];
+  type?: 'error' | 'success' | 'info';
 };
 
 type AlertListener = (config: AlertConfig | null) => void;
@@ -15,9 +16,14 @@ export const registerAlertListener = (listener: AlertListener) => {
 };
 
 export const CustomAlert = {
-  alert: (title: string, message: string, buttons?: AlertButton[]) => {
+  alert: (
+    title: string,
+    message: string,
+    buttons?: AlertButton[],
+    type?: 'error' | 'success' | 'info'
+  ) => {
     if (alertListener) {
-      alertListener({ title, message, buttons });
+      alertListener({ title, message, buttons, type });
     } else {
       // Fallback to native if not registered
       const { Alert } = require('react-native');

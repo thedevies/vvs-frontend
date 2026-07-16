@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import {
   ActivityIndicator,
   FlatList,
@@ -11,6 +11,7 @@ import {
   Modal,
   TextInput,
   Dimensions,
+  BackHandler,
 } from "react-native";
 import { CustomAlert as Alert } from "@/utils/alert";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -18,9 +19,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useState, useEffect, useCallback } from "react";
 import * as DocumentPicker from "expo-document-picker";
 import * as WebBrowser from "expo-web-browser";
-
-const { width: SW } = Dimensions.get("window");
-
+import * as ImagePicker from "expo-image-picker";
 import BottomNavigation from "@/components/navigation/BottomNavigation";
 import { ThemedText } from "@/components/themed-text";
 import { useAuth } from "@/context/AuthContext";
@@ -29,6 +28,8 @@ import { profileApi, interestApi, BASE_URL } from "@/utils/api";
 import type { UserPhoto } from "@/utils/types";
 import { eventEmitter } from "@/utils/events";
 import { useAppTheme } from "@/context/ThemeContext";
+
+const { width: SW } = Dimensions.get("window");
 
 export default function ProfileScreen() {
   const { user, logout, refreshUser } = useAuth();
@@ -79,11 +80,34 @@ export default function ProfileScreen() {
   const [fatherName, setFatherName] = useState("");
   const [motherName, setMotherName] = useState("");
 
+  // Photo multiple selection states
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<number>>(new Set());
+  const [photoToDeleteId, setPhotoToDeleteId] = useState<number | null>(null);
+
   const getParamValue = (value?: string | string[]) =>
     Array.isArray(value) ? value[0] : value;
 
   const view = getParamValue(params.view);
   const isOtherProfileView = view === "other";
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        if (isOtherProfileView) {
+          return false;
+        }
+        router.replace("/");
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+
+      return () => {
+        subscription.remove();
+      };
+    }, [isOtherProfileView])
+  );
 
   // Load photos & profile data on mount
   useEffect(() => {
@@ -150,12 +174,115 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleDeletePhoto = async (photoId: number) => {
+  const [uploadingGalleryPhoto, setUploadingGalleryPhoto] = useState(false);
+
+  const handleUploadGalleryPhoto = async () => {
+    try {
+      const permissionResult =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert(
+          isMr ? "परवानगी नाकारली" : "Permission Denied",
+          isMr
+            ? "फोटो अपलोड करण्यासाठी गॅलरी प्रवेश आवश्यक आहे."
+            : "Camera roll access is required to upload photos."
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const photoUri = result.assets[0].uri;
+        setUploadingGalleryPhoto(true);
+
+        const response = await profileApi.uploadPhoto(photoUri);
+        if (response.data) {
+          Alert.alert(
+            isMr ? "यशस्वी" : "Success",
+            isMr
+              ? "फोटो तुमच्या गॅलरीमध्ये यशस्वीरित्या अपलोड झाला!"
+              : "Photo uploaded to your gallery successfully!"
+          );
+          await loadPhotos();
+        } else {
+          Alert.alert(
+            isMr ? "अपलोड अयशस्वी" : "Upload Failed",
+            response.message || (isMr ? "फोटो अपलोड करण्यात अयशस्वी." : "Failed to upload photo.")
+          );
+        }
+      }
+    } catch (err: any) {
+      console.error("[ProfilePhotoUpload] Selection/upload failed:", err);
+      Alert.alert(isMr ? "त्रुटी" : "Error", err.message || (isMr ? "फोटो अपलोड करण्यात अयशस्वी." : "Failed to upload photo."));
+    } finally {
+      setUploadingGalleryPhoto(false);
+    }
+  };
+
+  const handleDeletePhoto = (photoId: number) => {
+    setPhotoToDeleteId(photoId);
+  };
+
+  const confirmDeleteSinglePhoto = async () => {
+    if (photoToDeleteId === null) return;
+    const photoId = photoToDeleteId;
+    setPhotoToDeleteId(null);
+    setLoadingPhotos(true);
+    try {
+      const res = await profileApi.deletePhoto(photoId);
+      if (res.message) {
+        Alert.alert(
+          isMr ? "यशस्वी" : "Success",
+          isMr
+            ? "फोटो यशस्वीरित्या हटवला गेला."
+            : "Photo deleted successfully!"
+        );
+        setPhotos((prev) => prev.filter((p) => p.id !== photoId));
+        setSelectedPhoto(null);
+      }
+    } catch (err: any) {
+      Alert.alert(
+        isMr ? "त्रुटी" : "Error",
+        err.message ||
+          (isMr ? "फोटो हटवण्यात अयशस्वी." : "Failed to delete photo.")
+      );
+    } finally {
+      setLoadingPhotos(false);
+    }
+  };
+
+  const handlePhotoPress = (item: any) => {
+    if (isSelectionMode) {
+      const newSelected = new Set(selectedPhotoIds);
+      if (newSelected.has(item.id)) {
+        newSelected.delete(item.id);
+      } else {
+        newSelected.add(item.id);
+      }
+      setSelectedPhotoIds(newSelected);
+    } else {
+      setSelectedPhoto(item);
+    }
+  };
+
+  const cancelSelectionMode = () => {
+    setIsSelectionMode(false);
+    setSelectedPhotoIds(new Set());
+  };
+
+  const handleDeleteSelectedPhotos = () => {
+    if (selectedPhotoIds.size === 0) return;
+
     Alert.alert(
-      isMr ? "फोटो हटवा" : "Delete Photo",
+      isMr ? "निवडलेले फोटो हटवा" : "Delete Selected Photos",
       isMr
-        ? "तुम्हाला खात्री आहे की तुम्ही हा फोटो हटवू इच्छिता?"
-        : "Are you sure you want to delete this photo?",
+        ? `तुम्हाला खात्री आहे की तुम्ही निवडलेले ${selectedPhotoIds.size} फोटो हटवू इच्छिता?`
+        : `Are you sure you want to delete the selected ${selectedPhotoIds.size} photo(s)?`,
       [
         {
           text: isMr ? "रद्द करा" : "Cancel",
@@ -165,29 +292,36 @@ export default function ProfileScreen() {
           text: isMr ? "हटवा" : "Delete",
           style: "destructive",
           onPress: async () => {
+            setLoadingPhotos(true);
             try {
-              const res = await profileApi.deletePhoto(photoId);
-              if (res.message) {
+              const ids = Array.from(selectedPhotoIds);
+              let successCount = 0;
+              for (const id of ids) {
+                try {
+                  await profileApi.deletePhoto(id);
+                  successCount++;
+                } catch (e) {
+                  console.error(`Failed to delete photo ${id}:`, e);
+                }
+              }
+
+              if (successCount > 0) {
                 Alert.alert(
                   isMr ? "यशस्वी" : "Success",
                   isMr
-                    ? "फोटो यशस्वीरित्या हटवला गेला."
-                    : "Photo deleted successfully!",
+                    ? "निवडलेले फोटो यशस्वीरित्या हटवले गेले."
+                    : `${successCount} photo(s) deleted successfully!`
                 );
-                // Update local state list
-                setPhotos((prev) => prev.filter((p) => p.id !== photoId));
-                setSelectedPhoto(null);
+                setPhotos((prev) => prev.filter((p) => !selectedPhotoIds.has(p.id)));
               }
-            } catch (err: any) {
-              Alert.alert(
-                isMr ? "त्रुटी" : "Error",
-                err.message ||
-                  (isMr ? "फोटो हटवण्यात अयशस्वी." : "Failed to delete photo."),
-              );
+            } finally {
+              setLoadingPhotos(false);
+              setIsSelectionMode(false);
+              setSelectedPhotoIds(new Set());
             }
           },
         },
-      ],
+      ]
     );
   };
 
@@ -583,7 +717,25 @@ export default function ProfileScreen() {
     ? otherUser?.profile?.profilePhoto
     : user?.profile?.profilePhoto;
 
-  const galleryPhotos = photos.filter((p) => p.photoUrl !== profilePhotoPath);
+  const cleanPathForComparison = (path?: string | null) => {
+    if (!path) return '';
+    let clean = path;
+    if (clean.includes('/uploads/')) {
+      clean = clean.substring(clean.indexOf('/uploads/'));
+    } else if (clean.includes('uploads/')) {
+      clean = '/' + clean.substring(clean.indexOf('uploads/'));
+    }
+    if (!clean.startsWith('/')) {
+      clean = '/' + clean;
+    }
+    return clean.toLowerCase();
+  };
+
+  const galleryPhotos = photos.filter((p) => {
+    const cleanP = cleanPathForComparison(p.photoUrl);
+    const cleanProfile = cleanPathForComparison(profilePhotoPath);
+    return cleanP !== cleanProfile;
+  });
 
   return (
     <View
@@ -665,11 +817,9 @@ export default function ProfileScreen() {
                 : ""}
             </ThemedText>
 
-            {/* Bio */}
             {displayBio ? (
               <ThemedText
                 style={[styles.heroBio, { color: colors.textSecondary }]}
-                numberOfLines={3}
               >
                 {displayBio}
               </ThemedText>
@@ -1127,6 +1277,48 @@ export default function ProfileScreen() {
           {/* ── Photos Grid ── */}
           {(galleryPhotos.length > 0 || !isOtherProfileView) && (
             <View style={styles.photoGridSection}>
+              {/* Gallery Section Header with Selection Controls */}
+              <View style={styles.photoSectionHeader}>
+                <ThemedText style={[styles.photoSectionTitle, { color: colors.text }]}>
+                  {isMr ? "गॅलरी" : "Gallery"} ({galleryPhotos.length})
+                </ThemedText>
+                
+                {!isOtherProfileView && galleryPhotos.length > 0 && (
+                  <View style={styles.photoActionButtons}>
+                    {isSelectionMode ? (
+                      <>
+                        <TouchableOpacity 
+                          style={[styles.manageBtn, { marginRight: 8 }]} 
+                          onPress={handleDeleteSelectedPhotos}
+                          disabled={selectedPhotoIds.size === 0}
+                        >
+                          <ThemedText style={[styles.manageBtnText, { color: selectedPhotoIds.size === 0 ? colors.muted : '#ff4d4d', fontWeight: '700' }]}>
+                            {isMr ? `हटवा (${selectedPhotoIds.size})` : `Delete (${selectedPhotoIds.size})`}
+                          </ThemedText>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={styles.manageBtn} 
+                          onPress={cancelSelectionMode}
+                        >
+                          <ThemedText style={[styles.manageBtnText, { color: colors.textSecondary }]}>
+                            {isMr ? "रद्द करा" : "Cancel"}
+                          </ThemedText>
+                        </TouchableOpacity>
+                      </>
+                    ) : (
+                      <TouchableOpacity 
+                        style={styles.manageBtn} 
+                        onPress={() => setIsSelectionMode(true)}
+                      >
+                        <ThemedText style={[styles.manageBtnText, { color: '#FF4D8D' }]}>
+                          {isMr ? "निवडा" : "Select"}
+                        </ThemedText>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+              </View>
+
               {loadingPhotos && !isOtherProfileView ? (
                 <ActivityIndicator color="#FF4D8D" style={{ marginTop: 16 }} />
               ) : galleryPhotos.length > 0 ? (
@@ -1136,18 +1328,58 @@ export default function ProfileScreen() {
                   numColumns={3}
                   keyExtractor={(item) => item.id.toString()}
                   columnWrapperStyle={styles.photoRow}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={styles.photoThumb}
-                      onPress={() => setSelectedPhoto(item)}
-                    >
-                      <Image
-                        source={{ uri: getPhotoUrl(item.photoUrl) }}
-                        style={styles.photoThumbImg}
-                      />
-                    </TouchableOpacity>
-                  )}
+                  renderItem={({ item }) => {
+                    const isSelected = selectedPhotoIds.has(item.id);
+                    return (
+                      <TouchableOpacity
+                        style={[
+                          styles.photoThumb,
+                          isSelected && { borderColor: '#FF4D8D', borderWidth: 2 }
+                        ]}
+                        onPress={() => handlePhotoPress(item)}
+                      >
+                        <Image
+                          source={{ uri: getPhotoUrl(item.photoUrl) }}
+                          style={[
+                            styles.photoThumbImg,
+                            isSelected && { opacity: 0.7 }
+                          ]}
+                        />
+                        {isSelected && (
+                          <View style={styles.selectCheckboxOverlay}>
+                            <Ionicons name="checkmark-circle" size={18} color="#FF4D8D" />
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  }}
                 />
+              ) : !isOtherProfileView ? (
+                <TouchableOpacity
+                  style={[
+                    styles.noPhotosPlaceholder,
+                    { borderColor: colors.border, paddingVertical: 32, borderStyle: 'dashed', borderWidth: 1.5, borderRadius: 16 }
+                  ]}
+                  onPress={handleUploadGalleryPhoto}
+                  disabled={uploadingGalleryPhoto}
+                >
+                  {uploadingGalleryPhoto ? (
+                    <ActivityIndicator color="#FF4D8D" size="small" />
+                  ) : (
+                    <>
+                      <Ionicons
+                        name="add-circle-outline"
+                        size={48}
+                        color="#FF4D8D"
+                      />
+                      <ThemedText
+                        style={[styles.noPhotosText, { color: colors.muted }]}
+                      >
+                        {isMr ? "फोटो जोडा" : "Add Photo"}
+                      </ThemedText>
+                    </>
+                  )}
+                </TouchableOpacity>
               ) : (
                 <View
                   style={[
@@ -1421,7 +1653,13 @@ export default function ProfileScreen() {
         </Modal>
 
         {/* Full Photo Preview Modal */}
-        <Modal visible={!!selectedPhoto} transparent animationType="slide">
+        <Modal 
+          visible={!!selectedPhoto} 
+          transparent={false} 
+          statusBarTranslucent={true} 
+          animationType="slide"
+          onRequestClose={() => setSelectedPhoto(null)}
+        >
           <SafeAreaView
             style={[
               styles.previewContainer,
@@ -1463,51 +1701,27 @@ export default function ProfileScreen() {
                   ? galleryPhotos.indexOf(selectedPhoto!)
                   : 0
               }
-              getItemLayout={(_, index) => ({
-                length: SW + 76,
-                offset: (SW + 76) * index,
-                index,
-              })}
               renderItem={({ item }) => {
                 const imgUrl = getPhotoUrl(item.photoUrl);
                 return (
                   <View style={styles.instagramPostCard}>
                     {/* Post Header */}
-                    <View style={styles.instagramPostHeader}>
-                      <View style={styles.instagramPostHeaderLeft}>
-                        <Image
-                          source={{ uri: displayImage }}
-                          style={styles.instagramPostAvatar}
-                        />
-                        <View>
-                          <ThemedText style={styles.instagramPostName}>
-                            {isOtherProfileView
-                              ? otherUser?.profile?.fullName
-                              : user?.profile?.fullName}
-                          </ThemedText>
-                          <ThemedText style={styles.instagramPostLocation}>
-                            📍{" "}
-                            {isOtherProfileView
-                              ? otherUser?.profile?.city
-                              : user?.profile?.city || "VVS Member"}
-                          </ThemedText>
-                        </View>
-                      </View>
-
-                      {/* Delete button (if own profile) */}
-                      {!isOtherProfileView && (
+                    {!isOtherProfileView ? (
+                      <View style={[styles.instagramPostHeader, { justifyContent: 'flex-end', paddingVertical: 8 }]}>
                         <TouchableOpacity
                           style={styles.postDeleteBtn}
                           onPress={() => handleDeletePhoto(item.id)}
                         >
                           <Ionicons
-                            name="trash-outline"
-                            size={20}
-                            color="#ff5c5c"
+                            name="ellipsis-horizontal"
+                            size={22}
+                            color={colors.text}
                           />
                         </TouchableOpacity>
-                      )}
-                    </View>
+                      </View>
+                    ) : (
+                      <View style={{ height: 12 }} />
+                    )}
                     {/* Post Image */}
                     <Image
                       source={{ uri: imgUrl }}
@@ -1520,6 +1734,52 @@ export default function ProfileScreen() {
             />
           </SafeAreaView>
         </Modal>
+
+        {/* Custom Delete Single Photo Modal */}
+        <Modal
+          visible={photoToDeleteId !== null}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setPhotoToDeleteId(null)}
+        >
+          <View style={styles.deleteModalOverlay}>
+            <View style={[styles.customDeleteCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {/* Top Right Cross Icon */}
+              <TouchableOpacity
+                style={styles.modalCrossBtn}
+                onPress={() => setPhotoToDeleteId(null)}
+              >
+                <Ionicons name="close" size={22} color={colors.text} />
+              </TouchableOpacity>
+
+              <Ionicons
+                name="alert-circle-outline"
+                size={40}
+                color="#ff4d4d"
+                style={{ marginBottom: 14 }}
+              />
+
+              <ThemedText style={[styles.customDeleteTitle, { color: colors.text }]}>
+                {isMr ? "फोटो हटवा" : "Delete Photo"}
+              </ThemedText>
+
+              <ThemedText style={[styles.customDeleteMsg, { color: colors.textSecondary }]}>
+                {isMr
+                  ? "तुम्हाला खात्री आहे की तुम्ही हा फोटो हटवू इच्छिता?"
+                  : "Are you sure you want to delete this photo?"}
+              </ThemedText>
+
+              <TouchableOpacity
+                style={styles.customDeleteConfirmBtn}
+                onPress={confirmDeleteSinglePhoto}
+              >
+                <ThemedText style={styles.customDeleteConfirmBtnText}>
+                  {isMr ? "हटवा" : "Delete"}
+                </ThemedText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
       <BottomNavigation
         activeRouteOverride={isOtherProfileView ? "/search" : undefined}
@@ -1531,6 +1791,99 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   mainContainer: { flex: 1 },
   container: { flex: 1 },
+
+  // Photo selection layout styles
+  deleteModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  customDeleteCard: {
+    width: '100%',
+    maxWidth: 300,
+    borderRadius: 20,
+    borderWidth: 1.2,
+    padding: 24,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  modalCrossBtn: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  customDeleteTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  customDeleteMsg: {
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: 20,
+    paddingHorizontal: 6,
+  },
+  customDeleteConfirmBtn: {
+    backgroundColor: '#ff4d4d',
+    width: '100%',
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  customDeleteConfirmBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  photoSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  photoSectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  photoActionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  manageBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  manageBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  selectCheckboxOverlay: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1,
+    elevation: 2,
+  },
 
   // ── Top bar ──
   topBar: {

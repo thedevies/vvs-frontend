@@ -115,9 +115,11 @@ export default function MobileScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={24} color="#fff" />
-        </TouchableOpacity>
+        {!loading && (
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Feather name="arrow-left" size={24} color="#fff" />
+          </TouchableOpacity>
+        )}
       </View>
       
       <ScrollView contentContainerStyle={styles.scrollContainer}>

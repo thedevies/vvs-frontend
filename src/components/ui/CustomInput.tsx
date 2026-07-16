@@ -1,16 +1,20 @@
 import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
+import { useAppTheme } from '@/context/ThemeContext';
 
 export default function CustomInput({
   placeholder,
   secureTextEntry,
+  style,
   ...props
 }: TextInputProps) {
+  const { colors } = useAppTheme();
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
       <TextInput
         placeholder={placeholder}
-        placeholderTextColor="#777"
-        style={styles.input}
+        placeholderTextColor={colors.muted}
+        style={[styles.input, { color: colors.text }, style]}
         secureTextEntry={secureTextEntry}
         {...props}
       />
@@ -20,15 +24,12 @@ export default function CustomInput({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#17171C',
     borderRadius: 18,
     paddingHorizontal: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
   },
   input: {
     height: 58,
-    color: '#fff',
     fontSize: 16,
   },
 });

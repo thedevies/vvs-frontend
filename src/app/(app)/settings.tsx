@@ -1,5 +1,5 @@
-import { router } from 'expo-router';
-import { useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useState, useCallback } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -7,6 +7,7 @@ import {
   View,
   Modal,
   ActivityIndicator,
+  BackHandler,
 } from 'react-native';
 import { CustomAlert as Alert } from '@/utils/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,6 +24,21 @@ export default function SettingsScreen() {
   const { logout } = useAuth();
   const { colors, isDark, toggleTheme } = useAppTheme();
   const styles = getStyles(colors);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        router.replace("/profile");
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+
+      return () => {
+        subscription.remove();
+      };
+    }, [])
+  );
 
   const [accountOpen, setAccountOpen] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
@@ -198,10 +214,10 @@ export default function SettingsScreen() {
 
                 <TouchableOpacity
                   style={[styles.subRow, { borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth }]}
-                  onPress={() => handleItemPress('changePassword')}>
+                  onPress={() => handleItemPress('changeMobileNumber')}>
                   <View style={styles.rowLeft}>
-                    <Ionicons name="lock-closed-outline" size={16} color={colors.textSecondary ?? colors.text} style={{ width: 20 }} />
-                    <ThemedText style={[styles.subRowLabel, { color: colors.text }]}>{t('changePassword')}</ThemedText>
+                    <Ionicons name="phone-portrait-outline" size={16} color={colors.textSecondary ?? colors.text} style={{ width: 20 }} />
+                    <ThemedText style={[styles.subRowLabel, { color: colors.text }]}>{t('changeMobileNumber')}</ThemedText>
                   </View>
                   <Ionicons name="chevron-forward" size={15} color={colors.muted} />
                 </TouchableOpacity>

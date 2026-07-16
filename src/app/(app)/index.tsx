@@ -9,13 +9,14 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
+  BackHandler,
 } from "react-native";
 import { CustomAlert as Alert } from "@/utils/alert";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { useFonts } from 'expo-font';
+import { useFonts } from "expo-font";
 import BottomNavigation from "@/components/navigation/BottomNavigation";
 import { ThemedText } from "@/components/themed-text";
 import { useAuth } from "@/context/AuthContext";
@@ -118,64 +119,83 @@ export const testimonials = [
     coupleMr: "राहुल & प्रिया",
     coupleEn: "Rahul & Priya",
     cityMr: "पुणे",
-    quoteMr: "VVS मुळे आम्हाला योग्य जोडीदार मिळाला. हे व्यासपीठ आमच्यासाठी वरदान ठरले!",
-    quoteEn: "VVS helped us find the perfect match. This platform was a blessing for us!",
+    quoteMr:
+      "VVS मुळे आम्हाला योग्य जोडीदार मिळाला. हे व्यासपीठ आमच्यासाठी वरदान ठरले!",
+    quoteEn:
+      "VVS helped us find the perfect match. This platform was a blessing for us!",
     married: "Married • March 2024",
-    avatar: "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?q=80&w=400&auto=format&fit=crop",
+    avatar:
+      "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?q=80&w=400&auto=format&fit=crop",
   },
   {
     coupleMr: "अमित & सोनाली",
     coupleEn: "Amit & Sonali",
     cityMr: "नाशिक",
     quoteMr: "समाजाच्या बंधनात राहून योग्य निर्णय घेता आला. VVS ला धन्यवाद!",
-    quoteEn: "We could make the right decision within our community. Thank you VVS!",
+    quoteEn:
+      "We could make the right decision within our community. Thank you VVS!",
     married: "Married • July 2024",
-    avatar: "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?q=80&w=400&auto=format&fit=crop",
+    avatar:
+      "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?q=80&w=400&auto=format&fit=crop",
   },
   {
     coupleMr: "सचिन & अंजली",
     coupleEn: "Sachin & Anjali",
     cityMr: "मुंबई",
-    quoteMr: "VVS ने आमच्या दोघांचे विचार आणि कुटुंब जुळवून आणले. आम्ही अत्यंत आनंदी आहोत!",
-    quoteEn: "VVS aligned our thoughts and families beautifully. We are extremely happy!",
+    quoteMr:
+      "VVS ने आमच्या दोघांचे विचार आणि कुटुंब जुळवून आणले. आम्ही अत्यंत आनंदी आहोत!",
+    quoteEn:
+      "VVS aligned our thoughts and families beautifully. We are extremely happy!",
     married: "Married • October 2024",
-    avatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=400&auto=format&fit=crop",
+    avatar:
+      "https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=400&auto=format&fit=crop",
   },
   {
     coupleMr: "विक्रम & स्नेहा",
     coupleEn: "Vikram & Sneha",
     cityMr: "कोल्हापूर",
-    quoteMr: "विश्वासार्ह आणि सोपी पद्धत. आम्हा दोघांच्या आवडी-निवडी अगदी तंतोतंत जुळल्या.",
+    quoteMr:
+      "विश्वासार्ह आणि सोपी पद्धत. आम्हा दोघांच्या आवडी-निवडी अगदी तंतोतंत जुळल्या.",
     quoteEn: "Trustworthy and simple approach. Our hobbies matched perfectly.",
     married: "Married • December 2024",
-    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400&auto=format&fit=crop",
+    avatar:
+      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400&auto=format&fit=crop",
   },
   {
     coupleMr: "महेश & पूजा",
     coupleEn: "Mahesh & Pooja",
     cityMr: "नागपूर",
-    quoteMr: "फक्त काही दिवसांतच मला माझी सहचारिणी मिळाली. उत्कृष्ट सेवा आणि अनुभव!",
-    quoteEn: "Found my life partner within just a few days. Excellent service and support!",
+    quoteMr:
+      "फक्त काही दिवसांतच मला माझी सहचारिणी मिळाली. उत्कृष्ट सेवा आणि अनुभव!",
+    quoteEn:
+      "Found my life partner within just a few days. Excellent service and support!",
     married: "Married • January 2025",
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400&auto=format&fit=crop",
+    avatar:
+      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400&auto=format&fit=crop",
   },
   {
     coupleMr: "रोहन & ज्योती",
     coupleEn: "Rohan & Jyoti",
     cityMr: "ठाणे",
-    quoteMr: "आमच्या लग्नाचा प्रवास VVS मुळे सोपा आणि सुंदर झाला. आम्ही कायम ऋणी राहू.",
-    quoteEn: "Our wedding journey was made easy and beautiful by VVS. Forever grateful.",
+    quoteMr:
+      "आमच्या लग्नाचा प्रवास VVS मुळे सोपा आणि सुंदर झाला. आम्ही कायम ऋणी राहू.",
+    quoteEn:
+      "Our wedding journey was made easy and beautiful by VVS. Forever grateful.",
     married: "Married • April 2025",
-    avatar: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=400&auto=format&fit=crop",
+    avatar:
+      "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=400&auto=format&fit=crop",
   },
   {
     coupleMr: "अनीश & प्राची",
     coupleEn: "Anish & Prachi",
     cityMr: "संभाजीनगर",
-    quoteMr: "पारंपारिक मूल्यांची जपणूक करत आधुनिक पद्धतीने जोडीदार शोधण्याचे उत्तम व्यासपीठ.",
-    quoteEn: "A perfect platform to find a life partner preserving traditional values.",
+    quoteMr:
+      "पारंपारिक मूल्यांची जपणूक करत आधुनिक पद्धतीने जोडीदार शोधण्याचे उत्तम व्यासपीठ.",
+    quoteEn:
+      "A perfect platform to find a life partner preserving traditional values.",
     married: "Married • June 2025",
-    avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=400&auto=format&fit=crop",
+    avatar:
+      "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=400&auto=format&fit=crop",
   },
 ];
 
@@ -214,7 +234,10 @@ function CollapsibleHeading({
   const { colors } = useAppTheme();
   return (
     <TouchableOpacity
-      style={[styles.collapsibleHeading, { backgroundColor: colors.card, borderColor: colors.border }]}
+      style={[
+        styles.collapsibleHeading,
+        { backgroundColor: colors.card, borderColor: colors.border },
+      ]}
       onPress={onPress}
       activeOpacity={0.85}
     >
@@ -233,7 +256,12 @@ function CollapsibleHeading({
 function AboutSection({ isMr }: { isMr: boolean }) {
   const { colors } = useAppTheme();
   return (
-    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <View
+      style={[
+        styles.card,
+        { backgroundColor: colors.card, borderColor: colors.border },
+      ]}
+    >
       <View style={styles.aboutIconRow}>
         <ThemedText style={styles.aboutIcon}>🦚</ThemedText>
         <View style={styles.pill}>
@@ -279,7 +307,13 @@ function HowItWorksSection({ isMr }: { isMr: boolean }) {
             </View>
             {i < steps.length - 1 && <View style={styles.stepConnector} />}
           </View>
-          <View style={[styles.card, styles.stepCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View
+            style={[
+              styles.card,
+              styles.stepCard,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+          >
             <View style={styles.stepEmojiRow}>
               <ThemedText style={styles.stepEmoji}>{s.emoji}</ThemedText>
               <ThemedText style={styles.stepTitle}>
@@ -305,7 +339,14 @@ function EventsSection({ isMr }: { isMr: boolean }) {
       contentContainerStyle={styles.hScroll}
     >
       {events.map((e, i) => (
-        <View key={i} style={[styles.card, styles.eventCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View
+          key={i}
+          style={[
+            styles.card,
+            styles.eventCard,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
           <View style={styles.eventTagRow}>
             <View
               style={[
@@ -355,13 +396,19 @@ function TestimonialsSection({ isMr }: { isMr: boolean }) {
   };
 
   return (
-    <ScrollView 
-      horizontal 
+    <ScrollView
+      horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={{ paddingRight: 20, gap: 16 }}
     >
       {testimonials.slice(0, 6).map((t, i) => (
-        <View key={i} style={[styles.testimonialHorizontalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View
+          key={i}
+          style={[
+            styles.testimonialHorizontalCard,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
           <View style={styles.testimonialTop}>
             <View>
               <ImageBackground
@@ -385,17 +432,20 @@ function TestimonialsSection({ isMr }: { isMr: boolean }) {
               </ThemedText>
             </View>
           </View>
-          <View style={{ flex: 1, justifyContent: 'center', marginTop: 10 }}>
+          <View style={{ flex: 1, justifyContent: "center", marginTop: 10 }}>
             <ThemedText style={styles.testimonialQuote} numberOfLines={4}>
-              "{isMr ? t.quoteMr : t.quoteEn}"
+              {isMr ? t.quoteMr : t.quoteEn}
             </ThemedText>
           </View>
         </View>
       ))}
 
       {/* 7th item: Explore All button card */}
-      <TouchableOpacity 
-        style={[styles.exploreMoreStoriesCard, { backgroundColor: colors.card, borderColor: colors.border }]} 
+      <TouchableOpacity
+        style={[
+          styles.exploreMoreStoriesCard,
+          { backgroundColor: colors.card, borderColor: colors.border },
+        ]}
         onPress={() => navigateSafe("/success-stories")}
       >
         <View style={styles.exploreCirclePink}>
@@ -417,8 +467,8 @@ export default function HomeScreen() {
   const { colors, isDark } = useAppTheme();
   const isMr = language === "mr";
   const [fontsLoaded] = useFonts({
-    GrandHotel: require('@/assets/fonts/GrandHotel-Regular.ttf'),
-    YatraOne: require('@/assets/fonts/YatraOne-Regular.ttf'),
+    GrandHotel: require("@/assets/fonts/GrandHotel-Regular.ttf"),
+    YatraOne: require("@/assets/fonts/YatraOne-Regular.ttf"),
   });
   const scrollY = useRef(new Animated.Value(0)).current;
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -428,6 +478,21 @@ export default function HomeScreen() {
   // Real matches state & Auth Modal state
   const [realMatches, setRealMatches] = useState<any[]>([]);
   const [showAuthModal, setShowAuthModal] = useState(false);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        BackHandler.exitApp();
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+
+      return () => {
+        subscription.remove();
+      };
+    }, [])
+  );
 
   const isNavigating = useRef(false);
   const navigateSafe = (route: any) => {
@@ -463,7 +528,7 @@ export default function HomeScreen() {
     try {
       console.log("[Home] Loading real matches from backend...");
       const usePublic = !isAuthenticated || !profileCompleted;
-      const response = usePublic 
+      const response = usePublic
         ? await profileApi.getPublicProfiles(1, 10)
         : await profileApi.getPartnerPreferenceProfiles(1, 10);
       if (response.data) {
@@ -534,9 +599,7 @@ export default function HomeScreen() {
 
   const navBgColor = scrollY.interpolate({
     inputRange: [0, 80],
-    outputRange: isDark
-      ? ["#17171C", "#17171C"]
-      : ["#E2E2E6", "#FFFFFF"],
+    outputRange: isDark ? ["#17171C", "#17171C"] : ["#E2E2E6", "#FFFFFF"],
     extrapolate: "clamp",
   });
 
@@ -570,36 +633,48 @@ export default function HomeScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+      <StatusBar 
+        barStyle={isDark ? "light-content" : "dark-content"} 
+        backgroundColor="transparent" 
+        translucent={true} 
+      />
 
       {/* Fixed Top Navigation Header */}
       <Animated.View
         style={[
           styles.topHeader,
-          { 
-            transform: [{ translateY: navbarTranslateY }], 
-            backgroundColor: navBgColor, 
-            borderBottomColor: colors.border 
+          {
+            transform: [{ translateY: navbarTranslateY }],
+            backgroundColor: navBgColor,
+            borderBottomColor: colors.border,
           },
         ]}
       >
         <SafeAreaView edges={["top"]}>
           <View style={styles.topHeaderContent}>
             {/* Left: Brand name */}
-            <ThemedText style={[styles.headerCursiveTitle, { fontSize: isMr ? 21 : 32, fontFamily: isMr ? "YatraOne" : "GrandHotel", color: colors.text }]}>
+            <ThemedText
+              style={[
+                styles.headerCursiveTitle,
+                {
+                  fontSize: isMr ? 21 : 32,
+                  fontFamily: isMr ? "YatraOne" : "GrandHotel",
+                  color: colors.text,
+                },
+              ]}
+            >
               {isMr ? "वासुदेव विवाह सोहळा" : "Vasudev Vivah Sohala"}
             </ThemedText>
 
             {/* Right Corner: Bell notification icon */}
-            <TouchableOpacity 
-              style={[styles.notifBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+            <TouchableOpacity
+              style={[
+                styles.notifBtn,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
               onPress={() => navigateSafe("/requests")}
             >
-              <Feather
-                name="bell"
-                size={20}
-                color={colors.text}
-              />
+              <Feather name="bell" size={20} color={colors.text} />
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -622,51 +697,45 @@ export default function HomeScreen() {
             imageStyle={styles.heroImg}
             resizeMode="cover"
           >
-            <View style={[styles.heroOverlay, { backgroundColor: isDark ? "rgba(5,5,10,0.62)" : "rgba(5,5,10,0.35)" }]}>
+            <View
+              style={[
+                styles.heroOverlay,
+                {
+                  backgroundColor: isDark
+                    ? "rgba(5,5,10,0.62)"
+                    : "rgba(5,5,10,0.35)",
+                },
+              ]}
+            >
               <View style={styles.heroContent}>
-                <ThemedText style={[styles.heroTitle, { color: isDark ? "#B0B0BE" : "#ded6e2fc" }]}>
+                <ThemedText
+                  style={[
+                    styles.heroTitle,
+                    { color: isDark ? "#B0B0BE" : "#ded6e2fc" },
+                  ]}
+                >
                   {isMr
                     ? "योग्य जोडीदार\nआपल्याच समाजात"
                     : "Find Your Perfect Match\nWithin Our Community"}
                 </ThemedText>
-                <ThemedText style={[styles.heroSub, { color: isDark ? "#B0B0BE" : "#ded6e2fc" }]}>
+                <ThemedText
+                  style={[
+                    styles.heroSub,
+                    { color: isDark ? "#B0B0BE" : "#ded6e2fc" },
+                  ]}
+                >
                   {isMr
                     ? "फक्त वासुदेव समाजासाठी"
                     : "Exclusively for the Vasudev community"}
                 </ThemedText>
                 <View style={styles.heroBtnRow}>
-                  {!profileCompleted ? (
-                    <>
-                      <TouchableOpacity
-                        style={styles.heroPrimary}
-                        onPress={handlePrimaryAction}
-                      >
-                        <ThemedText style={styles.heroPrimaryText}>
-                          {primaryLabel}
-                        </ThemedText>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.heroSecondary, { 
-                          borderColor: isDark ? "rgba(255,255,255,0.22)" : "rgba(0,0,0,0.2)",
-                          backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)"
-                        }]}
-                        onPress={handleExploreAction}
-                      >
-                        <ThemedText style={[styles.heroSecondaryText, { color: isDark ? WHITE : "#ded6e2fc" }]}>
-                          {isMr ? "शोधा" : "Explore"}
-                        </ThemedText>
-                      </TouchableOpacity>
-                    </>
-                  ) : (
+                  {!profileCompleted && (
                     <TouchableOpacity
-                      style={[styles.heroSecondary, { 
-                        borderColor: isDark ? "rgba(255,255,255,0.22)" : "rgba(0,0,0,0.2)",
-                        backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)"
-                      }]}
-                      onPress={handleExploreAction}
+                      style={styles.heroPrimary}
+                      onPress={handlePrimaryAction}
                     >
-                      <ThemedText style={[styles.heroSecondaryText, { color: isDark ? WHITE : "#111827" }]}>
-                        {isMr ? "शोधा" : "Explore Profiles"}
+                      <ThemedText style={styles.heroPrimaryText}>
+                        {primaryLabel}
                       </ThemedText>
                     </TouchableOpacity>
                   )}
@@ -715,10 +784,12 @@ export default function HomeScreen() {
                   }
                   if (!profileCompleted) {
                     Alert.alert(
-                      isMr ? 'प्रोफाइल अपूर्ण आहे' : 'Profile Incomplete',
-                      isMr ? 'कृपया प्रथम तुमची प्रोफाइल तयार करा.' : 'Please create your profile first.'
+                      isMr ? "प्रोफाइल अपूर्ण आहे" : "Profile Incomplete",
+                      isMr
+                        ? "कृपया प्रथम तुमची प्रोफाइल तयार करा."
+                        : "Please create your profile first.",
                     );
-                    navigateSafe('/edit-profile');
+                    navigateSafe("/edit-profile");
                     return;
                   }
                   Alert.alert(
@@ -734,10 +805,12 @@ export default function HomeScreen() {
                   }
                   if (!profileCompleted) {
                     Alert.alert(
-                      isMr ? 'प्रोफाइल अपूर्ण आहे' : 'Profile Incomplete',
-                      isMr ? 'कृपया प्रथम तुमची प्रोफाइल तयार करा.' : 'Please create your profile first.'
+                      isMr ? "प्रोफाइल अपूर्ण आहे" : "Profile Incomplete",
+                      isMr
+                        ? "कृपया प्रथम तुमची प्रोफाइल तयार करा."
+                        : "Please create your profile first.",
                     );
-                    navigateSafe('/edit-profile');
+                    navigateSafe("/edit-profile");
                     return;
                   }
                   navigateSafe({
@@ -768,7 +841,14 @@ export default function HomeScreen() {
                     key={profile.id}
                     activeOpacity={0.9}
                     onPress={handleCardPress}
-                    style={[styles.card, styles.profileCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    style={[
+                      styles.card,
+                      styles.profileCard,
+                      {
+                        backgroundColor: colors.card,
+                        borderColor: colors.border,
+                      },
+                    ]}
                   >
                     <ImageBackground
                       source={{ uri: imageUrl }}
@@ -791,7 +871,12 @@ export default function HomeScreen() {
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => navigateSafe("/explore")}
-              style={[styles.card, styles.profileCard, styles.exploreProfilesCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+              style={[
+                styles.card,
+                styles.profileCard,
+                styles.exploreProfilesCard,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
             >
               <View style={styles.exploreCirclePink}>
                 <Feather name="arrow-right" size={24} color="#FF4D8D" />
@@ -810,7 +895,12 @@ export default function HomeScreen() {
         </View>
 
         {/* ── CTA Banner ── */}
-        <View style={[styles.ctaBanner, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View
+          style={[
+            styles.ctaBanner,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
           <ThemedText style={styles.ctaEmoji}>🦚</ThemedText>
           <ThemedText style={styles.ctaTitle}>
             {isMr ? "आजच सुरुवात करा" : "Start Your Journey Today"}
@@ -828,7 +918,7 @@ export default function HomeScreen() {
               {profileCompleted
                 ? isMr
                   ? "प्रोफाइलला भेट द्या"
-                  : "Visit Profile"
+                  : "Explore Profiles"
                 : isMr
                   ? "प्रोफाइल तयार करा"
                   : "Create Profile"}
@@ -885,7 +975,12 @@ export default function HomeScreen() {
         </View>
 
         {/* ── Footer ── */}
-        <View style={[styles.footer, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
+        <View
+          style={[
+            styles.footer,
+            { backgroundColor: colors.card, borderTopColor: colors.border },
+          ]}
+        >
           <ThemedText style={styles.footerLabel}>Powered by</ThemedText>
           <ThemedText style={styles.footerCompany}>DHRUVEXA</ThemedText>
         </View>
@@ -1294,7 +1389,7 @@ const styles = StyleSheet.create({
   },
   testimonialHorizontalCard: {
     width: SW * 0.8,
-    height: 240,
+    height: 160,
     backgroundColor: CARD,
     borderRadius: 24,
     padding: 20,
@@ -1303,8 +1398,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   exploreMoreStoriesCard: {
-    width: 180,
-    height: 240,
+    width: 160,
+    height: 160,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: CARD,

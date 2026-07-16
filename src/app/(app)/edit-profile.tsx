@@ -86,7 +86,7 @@ export default function EditProfileScreen() {
   const [heightFeet, setHeightFeet] = useState(initialHeight.feet);
   const [heightInches, setHeightInches] = useState(initialHeight.inches);
   const [interests, setInterests] = useState<string[]>(
-    profile?.interest || ['Travel', 'AI', 'Music', 'Fitness', 'Photography']
+    profile?.interest || []
   );
   const [customInterestText, setCustomInterestText] = useState('');
 
@@ -106,7 +106,10 @@ export default function EditProfileScreen() {
     setCustomInterestText('');
   };
 
-  const [gender, setGender] = useState<Gender>((profile?.gender as Gender) || 'male');
+  const [gender, setGender] = useState<Gender>(() => {
+    const g = profile?.gender?.toLowerCase();
+    return (g === 'male' || g === 'female' ? g : 'male') as Gender;
+  });
   const [maritalStatus, setMaritalStatus] = useState<MaritalStatus>(
     (profile?.maritalStatus as MaritalStatus) || 'never_married'
   );
@@ -268,19 +271,19 @@ export default function EditProfileScreen() {
     if (!name.trim()) {
       const msg = 'Please enter your full name.';
       setError(msg);
-      Alert.alert('Validation Error', msg);
+      Alert.alert('Validation Error', msg, undefined, 'error');
       return;
     }
     if (!heightFeet.trim() || !heightInches.trim()) {
       const msg = 'Please enter your height in feet and inches (e.g. 5 ft 10 in).';
       setError(msg);
-      Alert.alert('Validation Error', msg);
+      Alert.alert('Validation Error', msg, undefined, 'error');
       return;
     }
     if (!dateOfBirth.trim()) {
       const msg = 'Please select your date of birth.';
       setError(msg);
-      Alert.alert('Validation Error', msg);
+      Alert.alert('Validation Error', msg, undefined, 'error');
       return;
     }
 
@@ -296,28 +299,35 @@ export default function EditProfileScreen() {
       const msg = 'Age must be at least 18 years old.';
       setError(msg);
       setAgeError(msg);
-      Alert.alert('Validation Error', msg);
+      Alert.alert('Validation Error', msg, undefined, 'error');
       return;
     }
     if (gender === 'male' && age < 21) {
       const msg = 'Age must be at least 21 years old.';
       setError(msg);
       setAgeError(msg);
-      Alert.alert('Validation Error', msg);
+      Alert.alert('Validation Error', msg, undefined, 'error');
       return;
     }
 
     if (!bio.trim()) {
       const msg = 'Please write a short bio about yourself.';
       setError(msg);
-      Alert.alert('Validation Error', msg);
+      Alert.alert('Validation Error', msg, undefined, 'error');
+      return;
+    }
+
+    if (bio.length > 250) {
+      const msg = 'Bio cannot exceed 250 characters.';
+      setError(msg);
+      Alert.alert('Validation Error', msg, undefined, 'error');
       return;
     }
 
     if (!profileCompleted && !photoUri) {
       const msg = 'Please select a profile photo.';
       setError(msg);
-      Alert.alert('Validation Error', msg);
+      Alert.alert('Validation Error', msg, undefined, 'error');
       return;
     }
 
@@ -326,32 +336,36 @@ export default function EditProfileScreen() {
     if (!user?.biodata) {
       const msg = 'Matrimonial biodata is mandatory! Please upload or generate your biodata below before saving.';
       setError(msg);
-      Alert.alert('Validation Error', msg);
+      Alert.alert('Validation Error', msg, undefined, 'error');
       return;
     }
 
     setSaving(true);
+    let stage = 'photo_upload';
 
     try {
       let uploadedPhotoUrl = profile?.profilePhoto || '';
 
       if (photoUri) {
-        console.log('[EditProfile] Uploading photo first...');
+        console.log('[EditProfile] Uploading profile photo first...');
         setUploadingPhoto(true);
         try {
-          const uploadRes = await profileApi.uploadPhoto(photoUri);
+          const uploadRes = await profileApi.uploadProfilePhoto(photoUri);
           if (uploadRes.data?.photoUrl) {
             uploadedPhotoUrl = uploadRes.data.photoUrl;
-            console.log('[EditProfile] Photo uploaded successfully:', uploadedPhotoUrl);
+            console.log('[EditProfile] Profile photo uploaded successfully:', uploadedPhotoUrl);
           } else {
             throw new Error('Failed to upload profile photo.');
           }
+        } catch (uploadErr: any) {
+          throw new Error(`[Profile Photo Section] ${uploadErr.message}`);
         } finally {
           setUploadingPhoto(false);
         }
       }
 
       if (!profileCompleted) {
+        stage = 'profile_creation';
         await profileApi.setupProfile({
           fullName: name.trim(),
           gender,
@@ -374,6 +388,7 @@ export default function EditProfileScreen() {
           { text: 'OK', onPress: () => router.replace('/explore') },
         ]);
       } else {
+        stage = 'profile_update';
         await profileApi.updateProfile({
           fullName: name.trim(),
           gender,
@@ -399,6 +414,25 @@ export default function EditProfileScreen() {
     } catch (err: any) {
       console.error('[EditProfile] Save error:', err);
       setError(err.message || 'Failed to save profile. Please try again.');
+
+      let errorLocation = 'General save step';
+      let cleanErrorMessage = err.message || '';
+
+      if (cleanErrorMessage.includes('[Profile Photo Section]')) {
+        errorLocation = 'Profile Photo Section';
+        cleanErrorMessage = cleanErrorMessage.replace('[Profile Photo Section] ', '');
+      } else if (stage === 'profile_creation') {
+        errorLocation = 'Profile Creation Section';
+      } else if (stage === 'profile_update') {
+        errorLocation = 'Profile Update Section';
+      }
+
+      Alert.alert(
+        'Profile Save Error',
+        `An error occurred in the "${errorLocation}".\n\nDetails: ${cleanErrorMessage || 'Please check your inputs and try again.'}`,
+        [{ text: 'OK' }],
+        'error'
+      );
     } finally {
       setSaving(false);
     }
@@ -581,8 +615,18 @@ export default function EditProfileScreen() {
               <View style={styles.inputGroup}>
                 <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Bio *</ThemedText>
                 <View style={styles.textAreaContainer}>
-                  <CustomInput placeholder="Tell us about yourself..." value={bio} onChangeText={setBio} />
+                  <CustomInput 
+                    placeholder="Tell us about yourself..." 
+                    value={bio} 
+                    onChangeText={setBio}
+                    multiline={true}
+                    maxLength={250}
+                    style={{ height: undefined, minHeight: 90, paddingTop: 10, paddingBottom: 10, textAlignVertical: 'top' }}
+                  />
                 </View>
+                <ThemedText style={{ alignSelf: 'flex-end', fontSize: 11, color: colors.textSecondary, marginTop: 4 }}>
+                  {bio.length}/250
+                </ThemedText>
               </View>
 
               <View style={styles.inputGroup}>
@@ -663,37 +707,70 @@ export default function EditProfileScreen() {
               </View>
             </View>
 
-            {/* ── Biodata Card ── */}
+             {/* ── Biodata Card ── */}
             <View style={[styles.card, styles.biodataCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={styles.biodataPanelLeft}>
-                <ThemedText style={[styles.biodataPanelTitle, { color: colors.text, fontSize: 16, fontWeight: '700' }]}>Biodata</ThemedText>
-              </View>
+              <TouchableOpacity
+                style={styles.biodataPanelLeft}
+                onPress={hasBiodata ? handleViewBiodata : undefined}
+                activeOpacity={hasBiodata ? 0.7 : 1}
+              >
+                <View style={styles.biodataInfoTexts}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <ThemedText style={[styles.biodataPanelTitle, { color: colors.text, fontSize: 16, fontWeight: '700' }]}>Biodata</ThemedText>
+                    {hasBiodata && (
+                      <Ionicons name="document-text-outline" size={14} color={ACCENT} style={{ marginLeft: 6 }} />
+                    )}
+                  </View>
+                  {hasBiodata && (
+                    <ThemedText style={[styles.biodataPanelStatus, { color: colors.textSecondary }]}>
+                      {biodataObj?.isGenerated ? 'Generated (Tap to view)' : 'Uploaded (Tap to view)'}
+                    </ThemedText>
+                  )}
+                </View>
+              </TouchableOpacity>
 
               <View style={styles.biodataPanelRight}>
-                <View style={styles.biodataPanelAddRow}>
-                  <TouchableOpacity
-                    style={[styles.biodataMiniBtn, { backgroundColor: colors.card2 || colors.background }]}
-                    onPress={handleUploadBiodata}
-                    disabled={uploadingBiodata}
-                  >
-                    {uploadingBiodata ? (
-                      <ActivityIndicator color={ACCENT} size="small" />
-                    ) : (
-                      <>
-                        <Ionicons name="cloud-upload-outline" size={12} color={ACCENT} />
-                        <ThemedText style={styles.biodataMiniBtnText}>Upload</ThemedText>
-                      </>
-                    )}
-                  </TouchableOpacity>
+                {hasBiodata ? (
+                  <View style={styles.biodataActionIconsRow}>
+                    <TouchableOpacity
+                      style={[styles.biodataOutlineBtn, { borderColor: ACCENT }]}
+                      onPress={handleViewBiodata}
+                    >
+                      <Feather name="eye" size={14} color={ACCENT} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.biodataOutlineBtn, { borderColor: ACCENT }]}
+                      onPress={handleUpdateBiodata}
+                    >
+                      <Feather name="edit-2" size={14} color={ACCENT} />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.biodataPanelAddRow}>
+                    <TouchableOpacity
+                      style={[styles.biodataMiniBtn, { backgroundColor: colors.card2 || colors.background }]}
+                      onPress={handleUploadBiodata}
+                      disabled={uploadingBiodata}
+                    >
+                      {uploadingBiodata ? (
+                        <ActivityIndicator color={ACCENT} size="small" />
+                      ) : (
+                        <>
+                          <Ionicons name="cloud-upload-outline" size={12} color={ACCENT} />
+                          <ThemedText style={styles.biodataMiniBtnText}>Upload</ThemedText>
+                        </>
+                      )}
+                    </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={[styles.biodataMiniBtn, styles.biodataMiniBtnPink]}
-                    onPress={() => setShowGenerateModal(true)}
-                  >
-                    <Ionicons name="sparkles-outline" size={12} color="#fff" />
-                    <ThemedText style={[styles.biodataMiniBtnText, { color: '#fff' }]}>Create</ThemedText>
-                  </TouchableOpacity>
-                </View>
+                    <TouchableOpacity
+                      style={[styles.biodataMiniBtn, styles.biodataMiniBtnPink]}
+                      onPress={() => setShowGenerateModal(true)}
+                    >
+                      <Ionicons name="sparkles-outline" size={12} color="#fff" />
+                      <ThemedText style={[styles.biodataMiniBtnText, { color: '#fff' }]}>Create</ThemedText>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             </View>
 

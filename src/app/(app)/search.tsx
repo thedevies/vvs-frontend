@@ -8,10 +8,11 @@ import {
   View,
   ActivityIndicator,
   Animated,
+  BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 
 import BottomNavigation from '@/components/navigation/BottomNavigation';
 import { ThemedText } from '@/components/themed-text';
@@ -39,6 +40,22 @@ const MAX_AGE_LIMIT = 45;
 
 export default function SearchScreen() {
   const { profileCompleted, user } = useAuth();
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        router.replace("/");
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+
+      return () => {
+        subscription.remove();
+      };
+    }, [])
+  );
+
   const [searchText, setSearchText] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [ageOpen, setAgeOpen] = useState(false);
