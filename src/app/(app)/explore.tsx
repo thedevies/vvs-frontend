@@ -686,38 +686,6 @@ export default function ExploreScreen() {
                           },
                         });
                       }}
-                      style={styles.profileCard}
-                      onPress={() => {
-                        if (!profileCompleted) {
-                          Alert.alert(
-                            "Profile Incomplete",
-                            "Please complete your profile to view other member details and send interest requests.",
-                          );
-                          navigateSafe("/edit-profile");
-                          return;
-                        }
-                        navigateSafe({
-                          pathname: "/profile",
-                          params: {
-                            view: "other",
-                            profileId: String(profile.userId),
-                            name: profile.fullName,
-                            age: String(age),
-                            role: profile.profession || "Not set",
-                            gender: (profile.gender || "male").toLowerCase(),
-                            bio: profile.bio || "",
-                            about: profile.bio || "",
-                            education: profile.education || "--",
-                            city: profile.city || "",
-                            state: profile.state || "",
-                            country: profile.country || "",
-                            height: profile.height || "--",
-                            interest: (profile.interest || []).join(","),
-                            image: imageUrl,
-                            isConnection: "false",
-                          },
-                        });
-                      }}
                     >
                       {/* Image on the left */}
                       <Image source={{ uri: imageUrl }} style={styles.avatar} />
