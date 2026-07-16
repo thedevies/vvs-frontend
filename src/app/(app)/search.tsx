@@ -44,7 +44,7 @@ export default function SearchScreen() {
   useFocusEffect(
     React.useCallback(() => {
       const onBackPress = () => {
-        router.replace("/");
+        router.replace("/explore");
         return true;
       };
 

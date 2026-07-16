@@ -97,7 +97,7 @@ export default function ProfileScreen() {
         if (isOtherProfileView) {
           return false;
         }
-        router.replace("/");
+        router.replace("/explore");
         return true;
       };
 

@@ -9,11 +9,12 @@ import {
   ActivityIndicator,
   RefreshControl,
   Platform,
+  BackHandler,
 } from "react-native";
 import { CustomAlert as Alert } from "@/utils/alert";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 
 import BottomNavigation from "@/components/navigation/BottomNavigation";
 import { ThemedText } from "@/components/themed-text";
@@ -42,6 +43,21 @@ export default function ExploreScreen() {
   const { colors } = useAppTheme();
   const styles = getStyles(colors);
   const isNavigating = React.useRef(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        router.replace("/");
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+
+      return () => {
+        subscription.remove();
+      };
+    }, [])
+  );
 
   const navigateSafe = (route: any) => {
     if (isNavigating.current) return;

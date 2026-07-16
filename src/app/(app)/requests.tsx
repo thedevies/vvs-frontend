@@ -44,7 +44,7 @@ export default function RequestsScreen() {
   useFocusEffect(
     React.useCallback(() => {
       const onBackPress = () => {
-        router.replace("/");
+        router.replace("/explore");
         return true;
       };
 
@@ -622,7 +622,6 @@ const getStyles = (colors: any) =>
     },
     miniAcceptBtn: {
       flexDirection: "row",
-      alignItems: "center",
       gap: 5,
       backgroundColor: ACCENT,
       borderRadius: 9,
