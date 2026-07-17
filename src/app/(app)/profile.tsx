@@ -16,7 +16,7 @@ import {
 import { CustomAlert as Alert } from "@/utils/alert";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import * as DocumentPicker from "expo-document-picker";
 import * as WebBrowser from "expo-web-browser";
 import * as ImagePicker from "expo-image-picker";
@@ -36,6 +36,7 @@ export default function ProfileScreen() {
   const { language, t } = useLanguage();
   const { colors, isDark } = useAppTheme();
   const isMr = language === "mr";
+  const photoFlatListRef = useRef<FlatList>(null);
   const params = useLocalSearchParams<{
     view?: string | string[];
     profileId?: string | string[];
@@ -513,6 +514,21 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleDeclinePress = async () => {
+    if (!interestId) return;
+    const targetUserId = Number(params.profileId);
+    try {
+      await interestApi.cancelInterest(interestId);
+      Alert.alert("Success", "Connection request declined.");
+      setInterestStatus(null);
+      setIsInterestSender(false);
+      setInterestId(null);
+      loadOtherProfile(targetUserId);
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Failed to decline request.");
+    }
+  };
+
   const buttonConfig = (() => {
     const base = "#FF4D8D";
     if (!isOtherProfileView) {
@@ -543,7 +559,7 @@ export default function ProfileScreen() {
         return {
           label: "Accept Request",
           icon: "checkmark-circle-outline" as const,
-          tintColor: "#3B9CFF",
+          tintColor: "#2E7D32",
           disabled: false,
         };
       }
@@ -907,35 +923,91 @@ export default function ProfileScreen() {
             )} */}
           </View>
 
-          {/* ── Connect Button (other profile) — full-width, below hero ── */}
+          {/* ── Connect Button (other profile) — full-width or side-by-side decline/approve ── */}
           {isOtherProfileView && (
             <View style={styles.connectSection}>
-              <TouchableOpacity
-                style={[
-                  styles.connectBtnFull,
-                  {
-                    backgroundColor: isDark ? colors.card : "#FFFFFF",
-                    borderColor: buttonConfig.tintColor,
-                  },
-                ]}
-                onPress={handleConnectPress}
-                disabled={buttonConfig.disabled}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name={buttonConfig.icon}
-                  size={15}
-                  color={buttonConfig.tintColor}
-                />
-                <ThemedText
+              {interestStatus === "PENDING" && !isInterestSender ? (
+                <View style={styles.profileActionRow}>
+                  <TouchableOpacity
+                    style={[
+                      styles.profileDeclineBtn,
+                      {
+                        backgroundColor: isDark ? colors.card : "#FFFFFF",
+                        borderColor: "#D32F2F",
+                      },
+                    ]}
+                    onPress={handleDeclinePress}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name="close-circle-outline"
+                      size={15}
+                      color="#D32F2F"
+                    />
+                    <ThemedText
+                      style={[
+                        styles.profileActionBtnText,
+                        { color: "#D32F2F" },
+                      ]}
+                    >
+                      Decline Request
+                    </ThemedText>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.profileApproveBtn,
+                      {
+                        backgroundColor: isDark ? colors.card : "#FFFFFF",
+                        borderColor: "#2E7D32",
+                      },
+                    ]}
+                    onPress={handleConnectPress}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name="checkmark-circle-outline"
+                      size={15}
+                      color="#2E7D32"
+                    />
+                    <ThemedText
+                      style={[
+                        styles.profileActionBtnText,
+                        { color: "#2E7D32" },
+                      ]}
+                    >
+                      Accept Request
+                    </ThemedText>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity
                   style={[
-                    styles.connectBtnFullText,
-                    { color: buttonConfig.tintColor },
+                    styles.connectBtnFull,
+                    {
+                      backgroundColor: isDark ? colors.card : "#FFFFFF",
+                      borderColor: buttonConfig.tintColor,
+                    },
                   ]}
+                  onPress={handleConnectPress}
+                  disabled={buttonConfig.disabled}
+                  activeOpacity={0.7}
                 >
-                  {buttonConfig.label}
-                </ThemedText>
-              </TouchableOpacity>
+                  <Ionicons
+                    name={buttonConfig.icon}
+                    size={15}
+                    color={buttonConfig.tintColor}
+                  />
+                  <ThemedText
+                    style={[
+                      styles.connectBtnFullText,
+                      { color: buttonConfig.tintColor },
+                    ]}
+                  >
+                    {buttonConfig.label}
+                  </ThemedText>
+                </TouchableOpacity>
+              )}
             </View>
           )}
 
@@ -1694,6 +1766,7 @@ export default function ProfileScreen() {
 
             {/* Vertical scroll list of posts */}
             <FlatList
+              ref={photoFlatListRef}
               data={galleryPhotos}
               keyExtractor={(item) => item.id.toString()}
               initialScrollIndex={
@@ -1701,6 +1774,14 @@ export default function ProfileScreen() {
                   ? galleryPhotos.indexOf(selectedPhoto!)
                   : 0
               }
+              onScrollToIndexFailed={(info) => {
+                setTimeout(() => {
+                  photoFlatListRef.current?.scrollToIndex({
+                    index: info.index,
+                    animated: false,
+                  });
+                }, 100);
+              }}
               renderItem={({ item }) => {
                 const imgUrl = getPhotoUrl(item.photoUrl);
                 return (
@@ -2055,6 +2136,48 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   connectBtnFullText: {
+    fontWeight: "700",
+    fontSize: 13,
+    letterSpacing: 0.2,
+  },
+  profileActionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    width: "100%",
+    paddingHorizontal: 20,
+  },
+  profileDeclineBtn: {
+    flex: 1,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1.2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  profileApproveBtn: {
+    flex: 1,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1.2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  profileActionBtnText: {
     fontWeight: "700",
     fontSize: 13,
     letterSpacing: 0.2,

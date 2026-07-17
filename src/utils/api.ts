@@ -367,6 +367,28 @@ export const notificationApi = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+
+  getNotifications: (page = 1, limit = 20) =>
+    request<ApiResponse>(`/notification?page=${page}&limit=${limit}`),
+
+  getUnreadCount: () =>
+    request<ApiResponse>('/notification/unread-count'),
+
+  markAsRead: (id: number) =>
+    request<ApiResponse>(`/notification/${id}/read`, {
+      method: 'PATCH',
+    }),
+
+  markAllAsRead: () =>
+    request<ApiResponse>('/notification/read-all', {
+      method: 'PATCH',
+    }),
+
+  testNotification: () =>
+    request<ApiResponse>('/notification/test', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
 };
 
 // Export base URL for debugging

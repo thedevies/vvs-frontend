@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import {
   Animated,
   Dimensions,
@@ -21,7 +21,7 @@ import BottomNavigation from "@/components/navigation/BottomNavigation";
 import { ThemedText } from "@/components/themed-text";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
-import { profileApi, BASE_URL } from "@/utils/api";
+import { profileApi, notificationApi, BASE_URL } from "@/utils/api";
 import AuthModal from "@/components/ui/AuthModal";
 import { useAppTheme } from "@/context/ThemeContext";
 
@@ -478,6 +478,39 @@ export default function HomeScreen() {
   // Real matches state & Auth Modal state
   const [realMatches, setRealMatches] = useState<any[]>([]);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const fetchUnreadCount = useCallback(async () => {
+    if (!user) return;
+    try {
+      const res = await notificationApi.getUnreadCount() as any;
+      if (res && res.unreadCount !== undefined) {
+        setUnreadCount(Number(res.unreadCount) || 0);
+      } else if (res && typeof res.data === 'object' && res.data !== null && 'unreadCount' in res.data) {
+        setUnreadCount(Number((res.data as any).unreadCount) || 0);
+      } else if (res && typeof res.data === 'object' && res.data !== null && 'count' in res.data) {
+        setUnreadCount(Number((res.data as any).count) || 0);
+      } else if (res && res.data !== undefined && typeof res.data !== 'object') {
+        setUnreadCount(Number(res.data) || 0);
+      }
+    } catch (err) {
+      console.log("[Notifications] Failed to load unread count:", err);
+    }
+  }, [user]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchUnreadCount();
+
+      const interval = setInterval(() => {
+        fetchUnreadCount();
+      }, 10000);
+
+      return () => {
+        clearInterval(interval);
+      };
+    }, [fetchUnreadCount])
+  );
 
   useFocusEffect(
     React.useCallback(() => {
@@ -675,6 +708,13 @@ export default function HomeScreen() {
               onPress={() => navigateSafe("/requests")}
             >
               <Feather name="bell" size={20} color={colors.text} />
+              {unreadCount > 0 && (
+                <View style={styles.badgeContainer}>
+                  <ThemedText style={styles.badgeText}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </ThemedText>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -1042,6 +1082,25 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 77, 141, 0.15)",
     borderWidth: 1,
     borderColor: "rgba(255, 77, 141, 0.35)",
+  },
+  badgeContainer: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#FF4D8D',
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#fff',
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 8.5,
+    fontWeight: '900',
+    textAlign: 'center',
   },
   headerIndicator: {
     padding: 8,

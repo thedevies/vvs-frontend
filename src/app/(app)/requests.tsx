@@ -17,7 +17,7 @@ import { router, useFocusEffect } from "expo-router";
 
 import BottomNavigation from "@/components/navigation/BottomNavigation";
 import { ThemedText } from "@/components/themed-text";
-import { interestApi, BASE_URL } from "@/utils/api";
+import { interestApi, notificationApi, BASE_URL } from "@/utils/api";
 import { useAppTheme } from "@/context/ThemeContext";
 
 const ACCENT = "#FF4D8D";
@@ -59,40 +59,55 @@ export default function RequestsScreen() {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const [notifications, setNotifications] = useState<any[]>([
-    {
-      id: "notif1",
-      title: "New Connection Request",
-      description: "Sneha Patil has sent you an interest request.",
-      icon: "heart",
-      type: "interests",
-      time: "5m ago",
-    },
-    {
-      id: "notif2",
-      title: "Complete Your Profile",
-      description: "Add bio details to get 3x more visibility.",
-      icon: "user",
-      type: "system",
-      time: "1d ago",
-    },
-    {
-      id: "notif3",
-      title: "Request Accepted 🎉",
-      description: "Rahul Shinde accepted your interest request.",
-      icon: "check-circle",
-      type: "interests",
-      time: "2h ago",
-    },
-    {
-      id: "notif4",
-      title: "Account Security Update",
-      description: "Your login session from vivo device was registered.",
-      icon: "shield",
-      type: "system",
-      time: "3d ago",
-    },
-  ]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+
+  const formatTime = (createdAtString: string): string => {
+    try {
+      const diffMs = Date.now() - new Date(createdAtString).getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      if (diffMins < 1) return "Just now";
+      if (diffMins < 60) return `${diffMins}m ago`;
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) return `${diffHours}h ago`;
+      const diffDays = Math.floor(diffHours / 24);
+      return `${diffDays}d ago`;
+    } catch {
+      return "1d ago";
+    }
+  };
+
+  const fetchNotifications = async (showLoading = true) => {
+    try {
+      if (showLoading) setLoading(true);
+      const res = await notificationApi.getNotifications(1, 50);
+      if (res && res.data) {
+        const formatted = (res.data as any[]).map((n) => {
+          let icon = "bell";
+          if (n.type === "PROFILE_MATCH") icon = "user-plus";
+          else if (n.type === "INTEREST_SENT") icon = "heart";
+          else if (n.type === "INTEREST_ACCEPTED") icon = "check-circle";
+
+          return {
+            id: n.id,
+            title: n.title,
+            description: n.body || n.message,
+            icon,
+            type: n.type === "PROFILE_MATCH" ? "interests" : "system",
+            time: formatTime(n.createdAt),
+            isRead: n.isRead,
+          };
+        });
+        setNotifications(formatted);
+
+        // Mark all as read
+        await notificationApi.markAllAsRead();
+      }
+    } catch (err) {
+      console.log("[Notifications] Failed to load notifications:", err);
+    } finally {
+      if (showLoading) setLoading(false);
+    }
+  };
 
   const [activeFilter, setActiveFilter] = useState<"all" | "interests" | "system">("all");
   const [selectedSection, setSelectedSection] = useState<"requests" | "activity">("requests");
@@ -105,7 +120,14 @@ export default function RequestsScreen() {
 
   useEffect(() => {
     fetchReceivedInterests();
+    fetchNotifications(false);
   }, []);
+
+  useEffect(() => {
+    if (selectedSection === "activity") {
+      fetchNotifications(false);
+    }
+  }, [selectedSection]);
 
   const getPhotoUrl = (path?: string | null): string => {
     if (!path) return FALLBACK_PHOTO;
@@ -623,7 +645,7 @@ const getStyles = (colors: any) =>
     miniAcceptBtn: {
       flexDirection: "row",
       gap: 5,
-      backgroundColor: ACCENT,
+      backgroundColor: "#2E7D32",
       borderRadius: 9,
       paddingHorizontal: 14,
       height: 32,

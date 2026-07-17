@@ -8,6 +8,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   View,
+  Image,
 } from "react-native";
 import { Feather, FontAwesome } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
@@ -50,6 +51,11 @@ export default function WelcomeScreen() {
         <SafeAreaView style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={styles.scrollContainer}>
             <View style={styles.headerContainer}>
+              <Image
+                source={require("@/assets/images/logo.png")}
+                style={styles.logo}
+                resizeMode="contain"
+              />
               <ThemedText style={styles.title}>
                 Welcome to{"\n"}
                 <ThemedText style={styles.brandTitle}>
@@ -160,8 +166,14 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "space-between",
     paddingHorizontal: 28,
-    paddingTop: 300,
+    paddingTop: 80,
     paddingBottom: 20,
+  },
+  logo: {
+    width: 130,
+    height: 130,
+    marginBottom: 10,
+    alignSelf: "center",
   },
   brandTitle: {
     fontFamily: "YatraOne",

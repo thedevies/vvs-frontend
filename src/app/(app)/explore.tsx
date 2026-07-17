@@ -285,6 +285,51 @@ export default function ExploreScreen() {
     }
   };
 
+  const handleApproveAction = async (targetProfile: UserProfile) => {
+    const interestId = (targetProfile as any).interestId;
+    if (!interestId) return;
+
+    try {
+      await interestApi.acceptInterest(interestId);
+      Alert.alert('Success', 'Connection request approved.');
+      // Update local state to ACCEPTED
+      setProfiles((prev) =>
+        prev.map((p) =>
+          p.userId === targetProfile.userId
+            ? ({ ...p, interestStatus: 'ACCEPTED' } as any)
+            : p
+        )
+      );
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to approve request.');
+    }
+  };
+
+  const handleDeclineAction = async (targetProfile: UserProfile) => {
+    const interestId = (targetProfile as any).interestId;
+    if (!interestId) return;
+
+    try {
+      await interestApi.cancelInterest(interestId);
+      Alert.alert('Success', 'Connection request declined.');
+      // Update local state to null
+      setProfiles((prev) =>
+        prev.map((p) =>
+          p.userId === targetProfile.userId
+            ? ({
+                ...p,
+                interestStatus: null,
+                isInterestSender: false,
+                interestId: null,
+              } as any)
+            : p
+        )
+      );
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to decline request.');
+    }
+  };
+
   const educationOptions = [
     "All",
     "B.Tech",
@@ -662,9 +707,10 @@ export default function ExploreScreen() {
                 {filteredProfiles.map((profile) => {
                   const age = getAge(profile.dateOfBirth);
                   const imageUrl = getPhotoUrl(profile.profilePhoto);
-                  const isRequested =
-                    (profile as any).interestStatus === "PENDING" ||
-                    (profile as any).interestStatus === "ACCEPTED";
+                  const interestStatus = (profile as any).interestStatus;
+                  const isPending = interestStatus === "PENDING";
+                  const isAccepted = interestStatus === "ACCEPTED";
+                  const isSender = (profile as any).isInterestSender;
 
                   return (
                     <TouchableOpacity
@@ -692,9 +738,9 @@ export default function ExploreScreen() {
                             bio: profile.bio || "",
                             about: profile.bio || "",
                             education: profile.education || "--",
-                            city: profile.city || "",
-                            state: profile.state || "",
-                            country: profile.country || "",
+                            city: profile.city || "Not set",
+                            state: profile.state || "Not set",
+                            country: profile.country || "Not set",
                             height: profile.height || "--",
                             interest: (profile.interest || []).join(","),
                             image: imageUrl,
@@ -743,29 +789,68 @@ export default function ExploreScreen() {
                         </View>
 
                         {/* Connection Button below info on the right */}
-                        <TouchableOpacity
-                          style={[
-                            styles.connectBtn,
-                            isRequested
-                              ? styles.connectBtnRequested
-                              : styles.connectBtnActive,
-                          ]}
-                          onPress={(e) => {
-                            e.stopPropagation();
-                            handleConnectionAction(profile);
-                          }}
-                          activeOpacity={0.85}
-                        >
-                          <Feather
-                            name={isRequested ? "x" : "user-plus"}
-                            size={13}
-                            color={ACCENT}
-                            style={{ marginRight: 6 }}
-                          />
-                          <ThemedText style={styles.connectBtnText}>
-                            {isRequested ? "Cancel Request" : "Connect"}
-                          </ThemedText>
-                        </TouchableOpacity>
+                        {isAccepted ? (
+                          <View style={[styles.connectBtn, styles.connectBtnConnected]}>
+                            <Feather name="check" size={13} color="#2E7D32" style={{ marginRight: 6 }} />
+                            <ThemedText style={[styles.connectBtnText, { color: '#2E7D32' }]}>
+                              Connected
+                            </ThemedText>
+                          </View>
+                        ) : isPending && isSender ? (
+                          <TouchableOpacity
+                            style={[styles.connectBtn, styles.connectBtnRequested]}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              handleConnectionAction(profile);
+                            }}
+                            activeOpacity={0.8}
+                          >
+                            <Feather name="user-x" size={13} color={ACCENT} style={{ marginRight: 6 }} />
+                            <ThemedText style={styles.connectBtnText}>
+                              Cancel Request
+                            </ThemedText>
+                          </TouchableOpacity>
+                        ) : isPending && !isSender ? (
+                          <View style={styles.approveDeclineRow}>
+                            <TouchableOpacity
+                              style={[styles.smallDeclineBtn]}
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                handleDeclineAction(profile);
+                              }}
+                              activeOpacity={0.8}
+                            >
+                              <Feather name="x" size={12} color="#D32F2F" style={{ marginRight: 4 }} />
+                              <ThemedText style={styles.smallDeclineBtnText}>Decline</ThemedText>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={[styles.smallApproveBtn]}
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                handleApproveAction(profile);
+                              }}
+                              activeOpacity={0.8}
+                            >
+                              <Feather name="check" size={12} color="#fff" style={{ marginRight: 4 }} />
+                              <ThemedText style={styles.smallApproveBtnText}>Approve</ThemedText>
+                            </TouchableOpacity>
+                          </View>
+                        ) : (
+                          <TouchableOpacity
+                            style={[styles.connectBtn, styles.connectBtnActive]}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              handleConnectionAction(profile);
+                            }}
+                            activeOpacity={0.8}
+                          >
+                            <Feather name="user-plus" size={13} color={ACCENT} style={{ marginRight: 6 }} />
+                            <ThemedText style={styles.connectBtnText}>
+                              Send Connection
+                            </ThemedText>
+                          </TouchableOpacity>
+                        )}
                       </View>
 
                       <View style={styles.chevronWrap}>
@@ -1191,6 +1276,47 @@ const getStyles = (colors: any) =>
     },
     connectBtnTextRequested: {
       color: ACCENT,
+    },
+    connectBtnConnected: {
+      backgroundColor: '#E8F5E9',
+      borderWidth: 1.2,
+      borderColor: '#A5D6A7',
+    },
+    approveDeclineRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      alignSelf: 'stretch',
+    },
+    smallDeclineBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      height: 36,
+      borderRadius: 10,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    smallDeclineBtnText: {
+      color: '#D32F2F',
+      fontSize: 12.5,
+      fontWeight: '700',
+    },
+    smallApproveBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      height: 36,
+      borderRadius: 10,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: '#2E7D32',
+    },
+    smallApproveBtnText: {
+      color: '#fff',
+      fontSize: 12.5,
+      fontWeight: '700',
     },
     avatar: {
       width: 95,
