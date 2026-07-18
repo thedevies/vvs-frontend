@@ -555,18 +555,19 @@ export default function RequestsScreen() {
                               style={[
                                 styles.notificationCard,
                                 styles.unreadNotificationCard,
-                                CARD_SHADOW,
                               ]}
                               onPress={() =>
                                 handleNotificationPress(notification)
                               }
                             >
-                              <View style={styles.notificationIcon}>
-                                <Feather
-                                  name={notification.icon as any}
-                                  size={15}
-                                  color={ACCENT}
-                                />
+                              <View style={styles.unreadIconRing}>
+                                <View style={styles.unreadNotificationIcon}>
+                                  <Feather
+                                    name={notification.icon as any}
+                                    size={16}
+                                    color={ACCENT}
+                                  />
+                                </View>
                               </View>
                               <View style={styles.notificationInfo}>
                                 <View style={styles.notificationTitleRow}>
@@ -579,7 +580,11 @@ export default function RequestsScreen() {
                                   >
                                     {notification.title}
                                   </ThemedText>
-                                  <View style={styles.unreadDot} />
+                                  <View style={styles.newBadge}>
+                                    <ThemedText style={styles.newBadgeText}>
+                                      NEW
+                                    </ThemedText>
+                                  </View>
                                 </View>
                                 <ThemedText
                                   style={styles.notificationDescription}
@@ -587,9 +592,11 @@ export default function RequestsScreen() {
                                 >
                                   {notification.description}
                                 </ThemedText>
-                                <ThemedText style={styles.notificationTime}>
-                                  {notification.time}
-                                </ThemedText>
+                                <View style={styles.notificationFooterRow}>
+                                  <ThemedText style={styles.notificationTime}>
+                                    {notification.time}
+                                  </ThemedText>
+                                </View>
                               </View>
                               <TouchableOpacity
                                 style={styles.closeButton}
@@ -637,12 +644,20 @@ export default function RequestsScreen() {
                             <TouchableOpacity
                               key={notification.id}
                               activeOpacity={0.8}
-                              style={[styles.notificationCard, CARD_SHADOW]}
+                              style={[
+                                styles.notificationCard,
+                                styles.readNotificationCard,
+                              ]}
                               onPress={() =>
                                 handleNotificationPress(notification)
                               }
                             >
-                              <View style={styles.notificationIcon}>
+                              <View
+                                style={[
+                                  styles.notificationIcon,
+                                  styles.readNotificationIcon,
+                                ]}
+                              >
                                 <Feather
                                   name={notification.icon as any}
                                   size={15}
@@ -651,20 +666,36 @@ export default function RequestsScreen() {
                               </View>
                               <View style={styles.notificationInfo}>
                                 <ThemedText
-                                  style={styles.notificationTitle}
+                                  style={[
+                                    styles.notificationTitle,
+                                    styles.readNotificationTitle,
+                                  ]}
                                   numberOfLines={1}
                                 >
                                   {notification.title}
                                 </ThemedText>
                                 <ThemedText
-                                  style={styles.notificationDescription}
+                                  style={[
+                                    styles.notificationDescription,
+                                    styles.readNotificationDescription,
+                                  ]}
                                   numberOfLines={2}
                                 >
                                   {notification.description}
                                 </ThemedText>
-                                <ThemedText style={styles.notificationTime}>
-                                  {notification.time}
-                                </ThemedText>
+                                <View style={styles.notificationFooterRow}>
+                                  <ThemedText style={styles.notificationTime}>
+                                    {notification.time}
+                                  </ThemedText>
+                                  <View style={styles.seenBadge}>
+                                    <Feather
+                                      name="check"
+                                      size={10}
+                                      color={colors.muted}
+                                      style={{ opacity: 0.7 }}
+                                    />
+                                  </View>
+                                </View>
                               </View>
                               <TouchableOpacity
                                 style={styles.closeButton}
@@ -1021,16 +1052,17 @@ const getStyles = (colors: any) =>
       alignItems: "flex-start",
       backgroundColor: colors.card,
       borderRadius: 16,
-      padding: 13,
-      gap: 10,
+      padding: 14,
+      paddingLeft: 12,
+      gap: 11,
       borderWidth: 1,
       borderColor: colors.border,
+      overflow: "hidden",
     },
     notificationIcon: {
-      width: 36,
-      height: 36,
-      borderRadius: 11,
-      backgroundColor: ACCENT_SOFT,
+      width: 38,
+      height: 38,
+      borderRadius: 12,
       justifyContent: "center",
       alignItems: "center",
       marginTop: 1,
@@ -1042,47 +1074,139 @@ const getStyles = (colors: any) =>
     notificationTitle: {
       fontSize: 13.5,
       fontWeight: "700",
+      letterSpacing: -0.1,
     },
     notificationDescription: {
       color: colors.muted,
       fontSize: 12,
-      marginTop: 2,
+      marginTop: 3,
       lineHeight: 17,
+    },
+    notificationFooterRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+      marginTop: 7,
     },
     notificationTime: {
       color: colors.muted,
-      opacity: 0.7,
+      opacity: 0.75,
       fontSize: 10.5,
-      marginTop: 5,
-      fontWeight: "500",
+      fontWeight: "600",
+      textTransform: "uppercase",
+      letterSpacing: 0.3,
     },
     closeButton: {
       padding: 4,
       marginTop: 1,
     },
+
+    // ── Unread: bold pink border, glowing icon ring, NEW pill ──
     unreadNotificationCard: {
-      borderLeftWidth: 4,
-      borderLeftColor: ACCENT,
-      backgroundColor:
-        colors.background === "#121214" ||
-        colors.text === "#fff" ||
-        colors.text === "#E2E2EC"
-          ? "rgba(255, 77, 141, 0.08)"
-          : "rgba(255, 77, 141, 0.04)",
+      // backgroundColor:
+      //   colors.background === "#121214" ||
+      //   colors.text === "#fff" ||
+      //   colors.text === "#E2E2EC"
+      //     ? "rgba(248, 51, 123, 0.035)" // Very light pink in dark mode
+      //     : "rgba(248, 51, 123, 0.02)",
+      borderColor: ACCENT_SOFT_BORDER,
+      shadowColor: ACCENT,
+      shadowOpacity: 0.18,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 3,
+      borderLeftWidth: 3.5,
+      borderLeftColor: "rgba(248, 51, 123, 0.93)",
+      // backgroundColor: colors.card,
+      opacity: 0.9,
+    },
+    unreadIconRing: {
+      width: 44,
+      height: 44,
+      borderRadius: 14,
+      justifyContent: "center",
+      alignItems: "center",
+      marginTop: 1,
+      borderWidth: 1.5,
+      borderColor: ACCENT_SOFT_BORDER,
+    },
+    unreadNotificationIcon: {
+      width: 38,
+      height: 38,
+      borderRadius: 12,
+      backgroundColor: ACCENT_SOFT,
+      justifyContent: "center",
+      alignItems: "center",
     },
     notificationTitleRow: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 6,
+      gap: 7,
     },
     unreadNotificationTitle: {
       fontWeight: "800",
+      color: colors.text,
+    },
+    newBadge: {
+      backgroundColor: ACCENT,
+      borderRadius: 6,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      shadowColor: ACCENT,
+      shadowOpacity: 0.5,
+      shadowRadius: 4,
+      shadowOffset: { width: 0, height: 1 },
+    },
+    newBadgeText: {
+      color: "#fff",
+      fontSize: 9,
+      fontWeight: "800",
+      letterSpacing: 0.4,
     },
     unreadDot: {
       width: 6,
       height: 6,
       borderRadius: 3,
       backgroundColor: ACCENT,
+    },
+
+    // ── Read: soft pink border (dimmer than unread), muted icon, faded text ──
+    readNotificationCard: {
+      borderLeftWidth: 3.5,
+      borderLeftColor: "rgba(248, 51, 123, 0.93)",
+      backgroundColor: colors.card,
+      opacity: 0.9,
+    },
+    readNotificationIcon: {
+      width: 38,
+      height: 38,
+      borderRadius: 12,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor:
+        colors.background === "#121214" ||
+        colors.text === "#fff" ||
+        colors.text === "#E2E2EC"
+          ? "rgba(255,255,255,0.06)"
+          : "rgba(20,20,25,0.05)",
+    },
+    readNotificationTitle: {
+      fontWeight: "600",
+      color: colors.muted,
+    },
+    readNotificationDescription: {
+      opacity: 0.85,
+    },
+    seenBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 3,
+    },
+    seenBadgeText: {
+      fontSize: 10,
+      fontWeight: "600",
+      color: colors.muted,
+      opacity: 0.7,
     },
 
     // Empty state
