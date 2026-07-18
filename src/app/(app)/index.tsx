@@ -1023,6 +1023,7 @@ export default function HomeScreen() {
         >
           <ThemedText style={styles.footerLabel}>Powered by</ThemedText>
           <ThemedText style={styles.footerCompany}>DHRUVEXA</ThemedText>
+           <ThemedText style={styles.footerCompany}>TECHNOLOGIES</ThemedText>
         </View>
       </Animated.ScrollView>
 

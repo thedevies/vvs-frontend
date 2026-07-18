@@ -60,7 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         fcmToken,
         platform,
       });
-      console.log('[Push] Device registered successfully:', response.message);
+      console.log('[Push] Device registered successfully:', response?.message || 'Success');
     } catch (err: any) {
       console.warn('[Push] Failed to register device with backend:', err.message);
     }

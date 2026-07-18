@@ -110,6 +110,23 @@ export default function ProfileScreen() {
     }, [isOtherProfileView])
   );
 
+  // Sync connection status parameters from route to local state immediately
+  useEffect(() => {
+    if (isOtherProfileView) {
+      const pStatus = getParamValue((params as any).interestStatus);
+      const pIsSender = getParamValue((params as any).isInterestSender);
+      const pInterestId = getParamValue((params as any).interestId);
+
+      if (pStatus) {
+        setInterestStatus(pStatus);
+      } else {
+        setInterestStatus(null);
+      }
+      setIsInterestSender(pIsSender === "true");
+      setInterestId(pInterestId ? Number(pInterestId) || null : null);
+    }
+  }, [(params as any).interestStatus, (params as any).isInterestSender, (params as any).interestId, isOtherProfileView]);
+
   // Load photos & profile data on mount
   useEffect(() => {
     if (isOtherProfileView && params.profileId) {
@@ -461,6 +478,36 @@ export default function ProfileScreen() {
     const otherData = otherUser as any;
     const targetUserId = otherUser.id || otherData.userId || otherData.id;
 
+    // 1.5. If interestStatus is ACCEPTED -> prompt to remove connection
+    if (interestStatus === "ACCEPTED" && interestId) {
+      Alert.alert(
+        "Remove Connection",
+        `Are you sure you want to remove your connection with ${otherUser.profile?.fullName || "this user"}?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Remove",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                await interestApi.cancelInterest(interestId);
+                Alert.alert("Success", "Connection removed.");
+                // Update dedicated state variables instantly
+                setInterestStatus(null);
+                setIsInterestSender(false);
+                setInterestId(null);
+                // Sync with backend in background
+                loadOtherProfile(targetUserId);
+              } catch (err: any) {
+                Alert.alert("Error", err.message || "Failed to remove connection.");
+              }
+            },
+          },
+        ]
+      );
+      return;
+    }
+
     // 1. If interestStatus is PENDING and we are the sender -> cancel it
     if (interestStatus === "PENDING" && isInterestSender && interestId) {
       try {
@@ -541,10 +588,10 @@ export default function ProfileScreen() {
     }
     if (interestStatus === "ACCEPTED") {
       return {
-        label: "Connected",
-        icon: "checkmark-circle" as const,
-        tintColor: "#3BB673",
-        disabled: true,
+        label: "Remove Connection",
+        icon: "close-circle-outline" as const,
+        tintColor: "#D32F2F",
+        disabled: false,
       };
     }
     if (interestStatus === "PENDING") {
@@ -1564,7 +1611,7 @@ export default function ProfileScreen() {
                   placeholderTextColor="#777"
                 />
 
-                <ThemedText style={styles.inputLabel}>Father's Name</ThemedText>
+                <ThemedText style={styles.inputLabel}>Fathers Name</ThemedText>
                 <TextInput
                   style={[
                     styles.textInput,

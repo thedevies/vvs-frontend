@@ -143,7 +143,7 @@ export default function ExploreScreen() {
           const newProfiles = response.data;
 
           // Apply age and gender filters locally
-          const ageFiltered = newProfiles.filter((p: any) => {
+          let ageFiltered = newProfiles.filter((p: any) => {
             const age = getAge(p.dateOfBirth);
             const ageMatch = age >= minAge && age <= maxAge;
 
@@ -159,6 +159,45 @@ export default function ExploreScreen() {
             }
             return ageMatch && genderMatch;
           });
+
+          // ── Merge received interest status onto profiles ──
+          // This ensures Accept/Decline buttons show even if backend
+          // doesn't return interestStatus in the profile list.
+          if (user) {
+            try {
+              const receivedRes = await interestApi.getReceivedInterests(1, 200);
+              if (receivedRes.data) {
+                // Build map: senderUserId -> { status, interestId }
+                const receivedMap = new Map<number, { status: string; interestId: number }>();
+                (receivedRes.data as any[]).forEach((item: any) => {
+                  const senderUserId = item.profile?.userId;
+                  if (senderUserId && item.status) {
+                    receivedMap.set(senderUserId, {
+                      status: item.status,
+                      interestId: item.interestId,
+                    });
+                  }
+                });
+
+                ageFiltered = ageFiltered.map((p: any) => {
+                  // Skip if backend already provided interest data
+                  if (p.interestStatus) return p;
+                  const received = receivedMap.get(p.userId);
+                  if (received) {
+                    return {
+                      ...p,
+                      interestStatus: received.status,
+                      isInterestSender: false, // they sent TO me
+                      interestId: received.interestId,
+                    };
+                  }
+                  return p;
+                });
+              }
+            } catch (err: any) {
+              console.log("[Explore] Interest merge fallback failed:", err.message);
+            }
+          }
 
           if (isRefresh || pageNum === 1) {
             setProfiles(ageFiltered);
@@ -235,7 +274,7 @@ export default function ExploreScreen() {
     const isRequested =
       (targetProfile as any).interestStatus === "PENDING" ||
       (targetProfile as any).interestStatus === "ACCEPTED";
-    const isSender = (targetProfile as any).isInterestSender;
+    const isSender = (targetProfile as any).isInterestSender === true || (targetProfile as any).isInterestSender === "true";
     const interestId = (targetProfile as any).interestId;
 
     if (isRequested && isSender && interestId) {
@@ -710,7 +749,7 @@ export default function ExploreScreen() {
                   const interestStatus = (profile as any).interestStatus;
                   const isPending = interestStatus === "PENDING";
                   const isAccepted = interestStatus === "ACCEPTED";
-                  const isSender = (profile as any).isInterestSender;
+                  const isSender = (profile as any).isInterestSender === true || (profile as any).isInterestSender === "true";
 
                   return (
                     <TouchableOpacity
@@ -744,6 +783,9 @@ export default function ExploreScreen() {
                             height: profile.height || "--",
                             interest: (profile.interest || []).join(","),
                             image: imageUrl,
+                            interestStatus: (profile as any).interestStatus || "",
+                            isInterestSender: String((profile as any).isInterestSender || false),
+                            interestId: String((profile as any).interestId || ""),
                             isConnection: "false",
                           },
                         });

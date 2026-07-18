@@ -41,21 +41,6 @@ export default function RequestsScreen() {
   const { colors } = useAppTheme();
   const styles = getStyles(colors);
 
-  useFocusEffect(
-    React.useCallback(() => {
-      const onBackPress = () => {
-        router.replace("/explore");
-        return true;
-      };
-
-      const subscription = BackHandler.addEventListener("hardwareBackPress", onBackPress);
-
-      return () => {
-        subscription.remove();
-      };
-    }, [])
-  );
-
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -84,7 +69,7 @@ export default function RequestsScreen() {
         const formatted = (res.data as any[]).map((n) => {
           let icon = "bell";
           if (n.type === "PROFILE_MATCH") icon = "user-plus";
-          else if (n.type === "INTEREST_SENT") icon = "heart";
+          else if (n.type === "INTEREST_RECEIVED") icon = "heart";
           else if (n.type === "INTEREST_ACCEPTED") icon = "check-circle";
 
           return {
@@ -92,15 +77,18 @@ export default function RequestsScreen() {
             title: n.title,
             description: n.body || n.message,
             icon,
-            type: n.type === "PROFILE_MATCH" ? "interests" : "system",
+            type: n.type,
+            category:
+              n.type === "INTEREST_RECEIVED" || n.type === "PROFILE_MATCH"
+                ? "interests"
+                : "system",
             time: formatTime(n.createdAt),
             isRead: n.isRead,
+            metadata: n.metadata,
+            referenceId: n.referenceId || null, // interestId for INTEREST_RECEIVED notifications
           };
         });
         setNotifications(formatted);
-
-        // Mark all as read
-        await notificationApi.markAllAsRead();
       }
     } catch (err) {
       console.log("[Notifications] Failed to load notifications:", err);
@@ -109,25 +97,18 @@ export default function RequestsScreen() {
     }
   };
 
-  const [activeFilter, setActiveFilter] = useState<"all" | "interests" | "system">("all");
-  const [selectedSection, setSelectedSection] = useState<"requests" | "activity">("requests");
+  const [activeFilter, setActiveFilter] = useState<
+    "all" | "interests" | "system"
+  >("all");
+  const [selectedSection, setSelectedSection] = useState<
+    "requests" | "activity"
+  >("requests");
   const [showDropdown, setShowDropdown] = useState(false);
 
   const filteredNotifications = notifications.filter((n) => {
     if (activeFilter === "all") return true;
-    return n.type === activeFilter;
+    return n.category === activeFilter;
   });
-
-  useEffect(() => {
-    fetchReceivedInterests();
-    fetchNotifications(false);
-  }, []);
-
-  useEffect(() => {
-    if (selectedSection === "activity") {
-      fetchNotifications(false);
-    }
-  }, [selectedSection]);
 
   const getPhotoUrl = (path?: string | null): string => {
     if (!path) return FALLBACK_PHOTO;
@@ -165,13 +146,14 @@ export default function RequestsScreen() {
             ? String(
                 Math.floor(
                   (Date.now() - new Date(profile.dateOfBirth).getTime()) /
-                    (365.25 * 24 * 60 * 60 * 1000)
-                )
+                    (365.25 * 24 * 60 * 60 * 1000),
+                ),
               )
             : "25";
 
           return {
             id: item.interestId,
+            senderUserId: profile.userId || null, // Store the sender's userId for notification fallback
             name: profile.fullName || "User",
             age,
             role: profile.profession || "N/A",
@@ -206,12 +188,170 @@ export default function RequestsScreen() {
       Alert.alert("Declined", "Connection request declined.");
       setRequests((prev) => prev.filter((r) => r.id !== interestId));
     } catch (err: any) {
-      Alert.alert("Error", err.message || "Failed to decline interest request.");
+      Alert.alert(
+        "Error",
+        err.message || "Failed to decline interest request.",
+      );
     }
+  };
+
+  // ADD THIS ↓
+  const handleRequestPress = (request: any) => {
+    if (!request.senderUserId) {
+      console.log(
+        "[Requests] No senderUserId on request, cannot navigate:",
+        request,
+      );
+      return;
+    }
+    router.push({
+      pathname: "/profile",
+      params: {
+        view: "other",
+        profileId: String(request.senderUserId),
+        interestStatus: "PENDING",
+        isInterestSender: "false",
+        interestId: String(request.id),
+      },
+    });
   };
 
   const handleDismissNotification = (id: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
+  };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchReceivedInterests();
+      fetchNotifications(false);
+
+      const onBackPress = () => {
+        router.replace("/explore");
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress,
+      );
+
+      return () => {
+        subscription.remove();
+      };
+    }, [selectedSection]),
+  );
+
+  const handleNotificationPress = async (notification: any) => {
+    // ── Step 1: Find senderId ──
+    let senderId: number | null = null;
+
+    // Try metadata first (backend injects senderId here)
+    if (notification.metadata) {
+      try {
+        const meta =
+          typeof notification.metadata === "string"
+            ? JSON.parse(notification.metadata)
+            : notification.metadata;
+        senderId = meta?.senderId || meta?.userId || null;
+      } catch (e) {
+        console.log("[Notifications] Failed to parse metadata:", e);
+      }
+    }
+
+    // Call the dedicated getNotificationSender backend endpoint to resolve it dynamically
+    if (!senderId) {
+      try {
+        const res = await notificationApi.getNotificationSender(
+          notification.id,
+        );
+        if (res && res.data && res.data.senderId) {
+          senderId = res.data.senderId;
+        }
+      } catch (e) {
+        console.log(
+          "[Notifications] Failed to resolve senderId via backend endpoint:",
+          e,
+        );
+      }
+    }
+
+    // Fallback: for INTEREST_RECEIVED, look up sender from received interests list
+    // notification.referenceId is the interestId stored by backend
+    // Our `requests` state stores { id: interestId, senderUserId }
+    if (!senderId && notification.type === "INTEREST_RECEIVED") {
+      // Try to find matching request by interestId (referenceId)
+      if (notification.referenceId) {
+        const matchingRequest = requests.find(
+          (r) => r.id === notification.referenceId,
+        );
+        if (matchingRequest?.senderUserId) {
+          senderId = matchingRequest.senderUserId;
+        }
+      }
+      // If still not found, refetch received interests and try again
+      if (!senderId) {
+        try {
+          const freshRes = await interestApi.getReceivedInterests(1, 200);
+          if (freshRes.data) {
+            // If we have referenceId, find the exact matching interest
+            if (notification.referenceId) {
+              for (const item of freshRes.data as any[]) {
+                if (item.interestId === notification.referenceId) {
+                  senderId = item.profile?.userId || null;
+                  break;
+                }
+              }
+            }
+            // Last resort: just take the first received interest's sender
+            if (!senderId) {
+              for (const item of freshRes.data as any[]) {
+                const profile = item.profile || {};
+                if (profile.userId) {
+                  senderId = profile.userId;
+                  break;
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.log("[Notifications] Interest lookup fallback failed:", e);
+        }
+      }
+    }
+
+    // ── Step 2: Mark as read (non-blocking — don't let this stop navigation) ──
+    if (!notification.isRead) {
+      try {
+        await notificationApi.markAsRead(notification.id);
+      } catch (e) {
+        console.log("[Notifications] Failed to mark as read:", e);
+      }
+      // Update local state regardless of API success
+      setNotifications((prev) =>
+        prev.map((n) =>
+          n.id === notification.id ? { ...n, isRead: true } : n,
+        ),
+      );
+    }
+
+    // ── Step 3: Navigate to sender's profile ──
+    if (senderId) {
+      router.push({
+        pathname: "/profile",
+        params: {
+          view: "other",
+          profileId: String(senderId),
+          interestStatus:
+            notification.type === "INTEREST_RECEIVED" ? "PENDING" : "",
+          isInterestSender: "false",
+        },
+      });
+    } else {
+      console.log(
+        "[Notifications] No senderId found, cannot navigate. notification:",
+        JSON.stringify(notification),
+      );
+    }
   };
 
   return (
@@ -255,45 +395,78 @@ export default function RequestsScreen() {
                 {requests.length > 0 ? (
                   <View style={styles.requestsList}>
                     {requests.map((request) => (
-                      <View key={request.id} style={[styles.requestCard, CARD_SHADOW]}>
-                        <Image source={{ uri: request.image }} style={styles.requestAvatar} />
+                      <TouchableOpacity
+                        key={request.id}
+                        style={[styles.requestCard, CARD_SHADOW]}
+                        activeOpacity={0.8}
+                        onPress={() => handleRequestPress(request)}
+                      >
+                        <Image
+                          source={{ uri: request.image }}
+                          style={styles.requestAvatar}
+                        />
                         <View style={styles.requestContent}>
-                          <ThemedText style={styles.requestName} numberOfLines={1}>
+                          <ThemedText
+                            style={styles.requestName}
+                            numberOfLines={1}
+                          >
                             {request.name}
                           </ThemedText>
-                          <ThemedText style={styles.requestRole} numberOfLines={1}>
+                          <ThemedText
+                            style={styles.requestRole}
+                            numberOfLines={1}
+                          >
                             {request.role}
                           </ThemedText>
                           <View style={styles.requestMetaRow}>
                             <View style={styles.requestMetaChip}>
-                              <Feather name="map-pin" size={10} color={colors.muted} />
-                              <ThemedText style={styles.requestMetaText} numberOfLines={1}>
+                              <Feather
+                                name="map-pin"
+                                size={10}
+                                color={colors.muted}
+                              />
+                              <ThemedText
+                                style={styles.requestMetaText}
+                                numberOfLines={1}
+                              >
                                 {request.city}
                               </ThemedText>
                             </View>
                             <View style={styles.requestMetaDot} />
-                            <ThemedText style={styles.requestMetaText}>{request.time}</ThemedText>
+                            <ThemedText style={styles.requestMetaText}>
+                              {request.time}
+                            </ThemedText>
                           </View>
 
                           <View style={styles.requestActionRow}>
                             <TouchableOpacity
                               style={styles.miniAcceptBtn}
-                              onPress={() => handleAcceptRequest(request.name, request.id)}
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                handleAcceptRequest(request.name, request.id);
+                              }}
                               activeOpacity={0.85}
                             >
                               <Feather name="check" size={13} color="#fff" />
-                              <ThemedText style={styles.miniBtnText}>Accept</ThemedText>
+                              <ThemedText style={styles.miniBtnText}>
+                                Accept
+                              </ThemedText>
                             </TouchableOpacity>
                             <TouchableOpacity
                               style={styles.miniDeclineBtn}
-                              onPress={() => handleDeclineRequest(request.id)}
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                handleDeclineRequest(request.id);
+                              }}
                               activeOpacity={0.85}
                             >
-                              <ThemedText style={styles.miniBtnTextDecline}>Decline</ThemedText>
+                              <ThemedText style={styles.miniBtnTextDecline}>
+                                Decline
+                              </ThemedText>
                             </TouchableOpacity>
                           </View>
                         </View>
-                      </View>
+                      </TouchableOpacity>
                     ))}
                   </View>
                 ) : (
@@ -301,7 +474,9 @@ export default function RequestsScreen() {
                     <View style={styles.emptyIconCircle}>
                       <Feather name="users" size={22} color={colors.muted} />
                     </View>
-                    <ThemedText style={styles.emptyTitle}>No pending requests</ThemedText>
+                    <ThemedText style={styles.emptyTitle}>
+                      No pending requests
+                    </ThemedText>
                     <ThemedText style={styles.emptyBody}>
                       New connection requests will show up here.
                     </ThemedText>
@@ -317,7 +492,10 @@ export default function RequestsScreen() {
                 {(["all", "interests", "system"] as const).map((filter) => (
                   <TouchableOpacity
                     key={filter}
-                    style={[styles.filterChip, activeFilter === filter && styles.filterChipActive]}
+                    style={[
+                      styles.filterChip,
+                      activeFilter === filter && styles.filterChipActive,
+                    ]}
                     onPress={() => setActiveFilter(filter)}
                     activeOpacity={0.8}
                   >
@@ -327,7 +505,11 @@ export default function RequestsScreen() {
                         activeFilter === filter && styles.filterChipTextActive,
                       ]}
                     >
-                      {filter === "all" ? "All" : filter === "interests" ? "Interests" : "System"}
+                      {filter === "all"
+                        ? "All"
+                        : filter === "interests"
+                          ? "Interests"
+                          : "System"}
                     </ThemedText>
                   </TouchableOpacity>
                 ))}
@@ -338,37 +520,172 @@ export default function RequestsScreen() {
                   <View style={styles.emptyIconCircle}>
                     <Feather name="bell-off" size={22} color={colors.muted} />
                   </View>
-                  <ThemedText style={styles.emptyTitle}>Nothing here yet</ThemedText>
+                  <ThemedText style={styles.emptyTitle}>
+                    Nothing here yet
+                  </ThemedText>
                   <ThemedText style={styles.emptyBody}>
                     No notifications in this category.
                   </ThemedText>
                 </View>
               ) : (
-                <View style={styles.notificationsList}>
-                  {filteredNotifications.map((notification) => (
-                    <View key={notification.id} style={[styles.notificationCard, CARD_SHADOW]}>
-                      <View style={styles.notificationIcon}>
-                        <Feather name={notification.icon as any} size={15} color={ACCENT} />
-                      </View>
-                      <View style={styles.notificationInfo}>
-                        <ThemedText style={styles.notificationTitle} numberOfLines={1}>
-                          {notification.title}
+                <ScrollView contentContainerStyle={styles.notificationsScroll}>
+                  {/* Unread Section */}
+                  {filteredNotifications.some((n) => !n.isRead) && (
+                    <View style={styles.notificationSection}>
+                      <View style={styles.sectionHeaderRow}>
+                        <ThemedText style={styles.sectionTitle}>
+                          Unread
                         </ThemedText>
-                        <ThemedText style={styles.notificationDescription} numberOfLines={2}>
-                          {notification.description}
-                        </ThemedText>
-                        <ThemedText style={styles.notificationTime}>{notification.time}</ThemedText>
+                        <View style={styles.countBadge}>
+                          <ThemedText style={styles.countBadgeText}>
+                            {
+                              filteredNotifications.filter((n) => !n.isRead)
+                                .length
+                            }
+                          </ThemedText>
+                        </View>
                       </View>
-                      <TouchableOpacity
-                        style={styles.closeButton}
-                        onPress={() => handleDismissNotification(notification.id)}
-                        hitSlop={6}
-                      >
-                        <Feather name="x" size={14} color={colors.muted} />
-                      </TouchableOpacity>
+                      <View style={styles.notificationsList}>
+                        {filteredNotifications
+                          .filter((n) => !n.isRead)
+                          .map((notification) => (
+                            <TouchableOpacity
+                              key={notification.id}
+                              activeOpacity={0.8}
+                              style={[
+                                styles.notificationCard,
+                                styles.unreadNotificationCard,
+                                CARD_SHADOW,
+                              ]}
+                              onPress={() =>
+                                handleNotificationPress(notification)
+                              }
+                            >
+                              <View style={styles.notificationIcon}>
+                                <Feather
+                                  name={notification.icon as any}
+                                  size={15}
+                                  color={ACCENT}
+                                />
+                              </View>
+                              <View style={styles.notificationInfo}>
+                                <View style={styles.notificationTitleRow}>
+                                  <ThemedText
+                                    style={[
+                                      styles.notificationTitle,
+                                      styles.unreadNotificationTitle,
+                                    ]}
+                                    numberOfLines={1}
+                                  >
+                                    {notification.title}
+                                  </ThemedText>
+                                  <View style={styles.unreadDot} />
+                                </View>
+                                <ThemedText
+                                  style={styles.notificationDescription}
+                                  numberOfLines={2}
+                                >
+                                  {notification.description}
+                                </ThemedText>
+                                <ThemedText style={styles.notificationTime}>
+                                  {notification.time}
+                                </ThemedText>
+                              </View>
+                              <TouchableOpacity
+                                style={styles.closeButton}
+                                onPress={(e) => {
+                                  e.stopPropagation();
+                                  handleDismissNotification(notification.id);
+                                }}
+                                hitSlop={6}
+                              >
+                                <Feather
+                                  name="x"
+                                  size={14}
+                                  color={colors.muted}
+                                />
+                              </TouchableOpacity>
+                            </TouchableOpacity>
+                          ))}
+                      </View>
                     </View>
-                  ))}
-                </View>
+                  )}
+
+                  {/* Read Section */}
+                  {filteredNotifications.some((n) => n.isRead) && (
+                    <View
+                      style={[
+                        styles.notificationSection,
+                        {
+                          marginTop: filteredNotifications.some(
+                            (n) => !n.isRead,
+                          )
+                            ? 20
+                            : 0,
+                        },
+                      ]}
+                    >
+                      <ThemedText
+                        style={[styles.sectionTitle, { color: colors.muted }]}
+                      >
+                        Earlier
+                      </ThemedText>
+                      <View style={styles.notificationsList}>
+                        {filteredNotifications
+                          .filter((n) => n.isRead)
+                          .map((notification) => (
+                            <TouchableOpacity
+                              key={notification.id}
+                              activeOpacity={0.8}
+                              style={[styles.notificationCard, CARD_SHADOW]}
+                              onPress={() =>
+                                handleNotificationPress(notification)
+                              }
+                            >
+                              <View style={styles.notificationIcon}>
+                                <Feather
+                                  name={notification.icon as any}
+                                  size={15}
+                                  color={colors.muted}
+                                />
+                              </View>
+                              <View style={styles.notificationInfo}>
+                                <ThemedText
+                                  style={styles.notificationTitle}
+                                  numberOfLines={1}
+                                >
+                                  {notification.title}
+                                </ThemedText>
+                                <ThemedText
+                                  style={styles.notificationDescription}
+                                  numberOfLines={2}
+                                >
+                                  {notification.description}
+                                </ThemedText>
+                                <ThemedText style={styles.notificationTime}>
+                                  {notification.time}
+                                </ThemedText>
+                              </View>
+                              <TouchableOpacity
+                                style={styles.closeButton}
+                                onPress={(e) => {
+                                  e.stopPropagation();
+                                  handleDismissNotification(notification.id);
+                                }}
+                                hitSlop={6}
+                              >
+                                <Feather
+                                  name="x"
+                                  size={14}
+                                  color={colors.muted}
+                                />
+                              </TouchableOpacity>
+                            </TouchableOpacity>
+                          ))}
+                      </View>
+                    </View>
+                  )}
+                </ScrollView>
               )}
             </View>
           )}
@@ -383,9 +700,17 @@ export default function RequestsScreen() {
           activeOpacity={1}
           onPress={() => setShowDropdown(false)}
         >
-          <View style={[styles.dropdownMenu, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View
+            style={[
+              styles.dropdownMenu,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+          >
             <TouchableOpacity
-              style={[styles.dropdownItem, selectedSection === "requests" && styles.dropdownItemActive]}
+              style={[
+                styles.dropdownItem,
+                selectedSection === "requests" && styles.dropdownItemActive,
+              ]}
               onPress={() => {
                 setSelectedSection("requests");
                 setShowDropdown(false);
@@ -395,7 +720,8 @@ export default function RequestsScreen() {
               <View
                 style={[
                   styles.dropdownItemIconWrap,
-                  selectedSection === "requests" && styles.dropdownItemIconWrapActive,
+                  selectedSection === "requests" &&
+                    styles.dropdownItemIconWrapActive,
                 ]}
               >
                 <Feather
@@ -408,13 +734,16 @@ export default function RequestsScreen() {
                 <ThemedText
                   style={[
                     styles.dropdownItemText,
-                    selectedSection === "requests" && styles.dropdownItemTextActive,
+                    selectedSection === "requests" &&
+                      styles.dropdownItemTextActive,
                   ]}
                 >
                   Connection Requests
                 </ThemedText>
                 {requests.length > 0 && (
-                  <ThemedText style={styles.dropdownItemSub}>{requests.length} pending</ThemedText>
+                  <ThemedText style={styles.dropdownItemSub}>
+                    {requests.length} pending
+                  </ThemedText>
                 )}
               </View>
               {selectedSection === "requests" && (
@@ -422,10 +751,18 @@ export default function RequestsScreen() {
               )}
             </TouchableOpacity>
 
-            <View style={[styles.dropdownDivider, { backgroundColor: colors.border }]} />
+            <View
+              style={[
+                styles.dropdownDivider,
+                { backgroundColor: colors.border },
+              ]}
+            />
 
             <TouchableOpacity
-              style={[styles.dropdownItem, selectedSection === "activity" && styles.dropdownItemActive]}
+              style={[
+                styles.dropdownItem,
+                selectedSection === "activity" && styles.dropdownItemActive,
+              ]}
               onPress={() => {
                 setSelectedSection("activity");
                 setShowDropdown(false);
@@ -435,7 +772,8 @@ export default function RequestsScreen() {
               <View
                 style={[
                   styles.dropdownItemIconWrap,
-                  selectedSection === "activity" && styles.dropdownItemIconWrapActive,
+                  selectedSection === "activity" &&
+                    styles.dropdownItemIconWrapActive,
                 ]}
               >
                 <Feather
@@ -448,7 +786,8 @@ export default function RequestsScreen() {
                 <ThemedText
                   style={[
                     styles.dropdownItemText,
-                    selectedSection === "activity" && styles.dropdownItemTextActive,
+                    selectedSection === "activity" &&
+                      styles.dropdownItemTextActive,
                   ]}
                 >
                   Recent Activity
@@ -721,6 +1060,30 @@ const getStyles = (colors: any) =>
       padding: 4,
       marginTop: 1,
     },
+    unreadNotificationCard: {
+      borderLeftWidth: 4,
+      borderLeftColor: ACCENT,
+      backgroundColor:
+        colors.background === "#121214" ||
+        colors.text === "#fff" ||
+        colors.text === "#E2E2EC"
+          ? "rgba(255, 77, 141, 0.08)"
+          : "rgba(255, 77, 141, 0.04)",
+    },
+    notificationTitleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+    unreadNotificationTitle: {
+      fontWeight: "800",
+    },
+    unreadDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: ACCENT,
+    },
 
     // Empty state
     emptyState: {
@@ -777,5 +1140,34 @@ const getStyles = (colors: any) =>
     },
     filterChipTextActive: {
       color: "#fff",
+    },
+    notificationsScroll: {
+      paddingBottom: 24,
+    },
+    notificationSection: {
+      gap: 12,
+    },
+    sectionHeaderRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    sectionTitle: {
+      fontSize: 14.5,
+      fontWeight: "800",
+      letterSpacing: 0.1,
+    },
+    countBadge: {
+      backgroundColor: ACCENT,
+      paddingHorizontal: 7,
+      paddingVertical: 1.5,
+      borderRadius: 10,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    countBadgeText: {
+      color: "#fff",
+      fontSize: 10.5,
+      fontWeight: "800",
     },
   });

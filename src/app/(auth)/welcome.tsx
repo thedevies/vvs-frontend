@@ -51,11 +51,6 @@ export default function WelcomeScreen() {
         <SafeAreaView style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={styles.scrollContainer}>
             <View style={styles.headerContainer}>
-              <Image
-                source={require("@/assets/images/logo.png")}
-                style={styles.logo}
-                resizeMode="contain"
-              />
               <ThemedText style={styles.title}>
                 Welcome to{"\n"}
                 <ThemedText style={styles.brandTitle}>

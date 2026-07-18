@@ -379,6 +379,9 @@ export const notificationApi = {
       method: 'PATCH',
     }),
 
+  getNotificationSender: (id: number) =>
+    request<ApiResponse<{ senderId: number | null }>>(`/notification/${id}/sender`),
+
   markAllAsRead: () =>
     request<ApiResponse>('/notification/read-all', {
       method: 'PATCH',
