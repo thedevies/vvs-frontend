@@ -207,8 +207,13 @@ export const profileApi = {
   getMyProfile: () =>
     request<ApiResponse<User>>('/profile/myProfile'),
 
-  getUserProfile: (userId: number) =>
-    request<ApiResponse<User>>(`/profile/user/${userId}`),
+  getUserProfile: async (userId: number) => {
+    const response = await request<ApiResponse<User>>(`/profile/user/${userId}`);
+    if (!response.data) {
+      console.warn(`[ProfileAPI] getUserProfile(${userId}) returned no data:`, response.message || response);
+    }
+    return response;
+  },
 
   getAllProfiles: (page: number, limit: number) =>
     request<ApiResponse<UserProfile[]>>(`/profile/getAllProfiles?page=${page}&limit=${limit}`),
@@ -353,7 +358,8 @@ export const interestApi = {
     }),
 
   getReceivedInterests: (page: number, limit: number, search?: string) => {
-    let url = `/interest/received?page=${page}&limit=${limit}`;
+    const safeLimit = Math.min(limit || 20, 100);
+    let url = `/interest/received?page=${page}&limit=${safeLimit}`;
     if (search) url += `&search=${encodeURIComponent(search)}`;
     return request<ApiResponse>(url);
   },

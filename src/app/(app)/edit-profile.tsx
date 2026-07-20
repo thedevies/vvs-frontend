@@ -367,6 +367,12 @@ export default function EditProfileScreen() {
       Alert.alert('Validation Error', msg, undefined, 'error');
       return;
     }
+    if (!maritalStatus || !maritalStatus.trim()) {
+      const msg = 'Please select your marital status.';
+      setError(msg);
+      Alert.alert('Validation Error', msg, undefined, 'error');
+      return;
+    }
 
     const dobDate = new Date(dateOfBirth);
     const today = new Date();
@@ -509,10 +515,16 @@ export default function EditProfileScreen() {
             numberOfSisters: piNumSisters ? parseInt(piNumSisters, 10) : undefined,
             marriedSisters: piMarriedSisters ? parseInt(piMarriedSisters, 10) : undefined,
           };
+          let piRes: any;
           if (piExists) {
-            await personalInformationApi.update(piPayload);
+            piRes = await personalInformationApi.update(piPayload);
+            if (piRes && !piRes.data) {
+              piRes = await personalInformationApi.add(piPayload);
+            }
           } else {
-            await personalInformationApi.add(piPayload);
+            piRes = await personalInformationApi.add(piPayload);
+          }
+          if (piRes?.data) {
             setPiExists(true);
           }
           await refreshUser();
@@ -526,6 +538,14 @@ export default function EditProfileScreen() {
 
       let errorLocation = 'General save step';
       let cleanErrorMessage = err.message || '';
+
+      if (
+        cleanErrorMessage.toLowerCase().includes('maritalstatus') ||
+        cleanErrorMessage.toLowerCase().includes('marital status') ||
+        cleanErrorMessage.includes('NEVER_MARRIED')
+      ) {
+        cleanErrorMessage = 'Please select your marital status.';
+      }
 
       if (cleanErrorMessage.includes('[Profile Photo Section]')) {
         errorLocation = 'Profile Photo Section';

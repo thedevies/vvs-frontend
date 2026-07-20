@@ -776,12 +776,16 @@ export default function ProfileScreen() {
           .join(", ")
       : otherCity
     : ownCity;
-  const displayPersonalInfo = isOtherProfileView
+  const rawPersonalInfo = isOtherProfileView
     ? (otherUser?.personalInformation ||
        (otherUser as any)?.user?.personalInformation ||
        (otherUser as any)?.personalInfo ||
        (otherUser as any)?.data?.personalInformation)
     : (personalInfo || user?.personalInformation);
+
+  const displayPersonalInfo = Array.isArray(rawPersonalInfo)
+    ? (rawPersonalInfo[0] || {})
+    : (rawPersonalInfo || {});
 
   const activeSuccessStory = isOtherProfileView
     ? otherUser?.successStory?.title
@@ -1394,7 +1398,8 @@ export default function ProfileScreen() {
                     ]}
                   >
                     {(() => {
-                      const pi = displayPersonalInfo || {};
+                      const rawPi = displayPersonalInfo;
+                      const pi = Array.isArray(rawPi) ? (rawPi[0] || {}) : (rawPi || {});
                       const targetProfile = isOtherProfileView ? (otherUser?.profile || (otherUser as any)?.user?.profile) : user?.profile;
                       const targetUserObj = isOtherProfileView ? ((otherUser as any)?.user || otherUser) : user;
 
@@ -1410,10 +1415,10 @@ export default function ProfileScreen() {
                       const targetState = pi.state || targetProfile?.state;
                       const targetReligion = pi.religion || (targetProfile as any)?.religion;
                       const targetCaste = pi.caste || (targetProfile as any)?.caste;
-                      const targetFatherName = pi.fatherName || fatherName;
+                      const targetFatherName = isOtherProfileView ? pi.fatherName : (pi.fatherName || fatherName);
                       const targetFatherMobile = pi.fatherMobileNumber || (pi as any)?.fatherMobile;
                       const targetFatherOcc = pi.fatherOccupation;
-                      const targetMotherName = pi.motherName || motherName;
+                      const targetMotherName = isOtherProfileView ? pi.motherName : (pi.motherName || motherName);
                       const targetMotherOcc = pi.motherOccupation;
 
                       const numBrothers = pi.numberOfBrothers !== undefined && pi.numberOfBrothers !== null ? pi.numberOfBrothers : (pi as any)?.numberOfBrothers;
