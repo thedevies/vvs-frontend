@@ -142,22 +142,11 @@ export default function ExploreScreen() {
         if (response.data) {
           const newProfiles = response.data;
 
-          // Apply age and gender filters locally
+          // Filter profiles by age/gender only if explicitly filtered
           let ageFiltered = newProfiles.filter((p: any) => {
             const age = getAge(p.dateOfBirth);
             const ageMatch = age >= minAge && age <= maxAge;
-
-            let genderMatch = true;
-            if (user && user.profile) {
-              const lookingFor = (user.profile.lookingFor || "").toLowerCase();
-              const pGender = (p.gender || "").toLowerCase();
-              if (lookingFor === "bride" || lookingFor === "female") {
-                genderMatch = pGender === "female";
-              } else if (lookingFor === "groom" || lookingFor === "male") {
-                genderMatch = pGender === "male";
-              }
-            }
-            return ageMatch && genderMatch;
+            return ageMatch;
           });
 
           // ── Merge received interest status onto profiles ──

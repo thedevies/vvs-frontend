@@ -24,7 +24,7 @@ import BottomNavigation from "@/components/navigation/BottomNavigation";
 import { ThemedText } from "@/components/themed-text";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
-import { profileApi, interestApi, BASE_URL } from "@/utils/api";
+import { profileApi, interestApi, personalInformationApi, successStoryApi, BASE_URL } from "@/utils/api";
 import type { UserPhoto } from "@/utils/types";
 import { eventEmitter } from "@/utils/events";
 import { useAppTheme } from "@/context/ThemeContext";
@@ -81,6 +81,24 @@ export default function ProfileScreen() {
   const [fatherName, setFatherName] = useState("");
   const [motherName, setMotherName] = useState("");
 
+  // Pre-fill father/mother & personalInfo from personal information API
+  useEffect(() => {
+    const fetchPersonalInfoOnMount = async () => {
+      try {
+        const res = await personalInformationApi.getDetails();
+        if (res?.data) {
+          const pi = res.data as any;
+          setPersonalInfo(pi);
+          if (pi.fatherName) setFatherName(pi.fatherName);
+          if (pi.motherName) setMotherName(pi.motherName);
+        }
+      } catch {
+        // silent — personal info is optional
+      }
+    };
+    fetchPersonalInfoOnMount();
+  }, []);
+
   // Photo multiple selection states
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<number>>(new Set());
@@ -110,6 +128,64 @@ export default function ProfileScreen() {
     }, [isOtherProfileView])
   );
 
+  const [mySuccessStory, setMySuccessStory] = useState<any>(null);
+  const [personalInfo, setPersonalInfo] = useState<any>(() => user?.personalInformation || null);
+  const [showPersonalInfoExpand, setShowPersonalInfoExpand] = useState(false);
+
+  // Instantly sync personalInfo state when AuthContext user changes
+  useEffect(() => {
+    if (!isOtherProfileView && user?.personalInformation) {
+      setPersonalInfo(user.personalInformation);
+    }
+  }, [isOtherProfileView, user?.personalInformation]);
+
+  const loadSuccessStory = useCallback(async () => {
+    try {
+      const res = await successStoryApi.myStory();
+      if (res.data) setMySuccessStory(res.data);
+      else setMySuccessStory(null);
+    } catch (e) {
+      console.log("[Profile] Failed to load success story:", e);
+    }
+  }, []);
+
+  const loadPersonalInfo = useCallback(async () => {
+    try {
+      const res = await personalInformationApi.getDetails();
+      if (res.data) setPersonalInfo(res.data);
+    } catch (e) {
+      console.log("[Profile] Failed to load personal info:", e);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isOtherProfileView) {
+        loadSuccessStory();
+        loadPersonalInfo();
+      }
+    }, [isOtherProfileView, loadSuccessStory, loadPersonalInfo])
+  );
+
+  const handleDeleteSuccessStory = async () => {
+    Alert.alert("Delete Success Story", "Are you sure you want to delete your success story?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await successStoryApi.deleteStory();
+            setMySuccessStory(null);
+            Alert.alert("Deleted", "Your success story has been removed.");
+          } catch (e: any) {
+            Alert.alert("Error", e.message || "Failed to delete success story.");
+          }
+        },
+      },
+    ]);
+  };
+
   // Sync connection status parameters from route to local state immediately
   useEffect(() => {
     if (isOtherProfileView) {
@@ -129,8 +205,9 @@ export default function ProfileScreen() {
 
   // Load photos & profile data on mount
   useEffect(() => {
-    if (isOtherProfileView && params.profileId) {
-      loadOtherProfile(Number(params.profileId));
+    const pid = getParamValue(params.profileId);
+    if (isOtherProfileView && pid) {
+      loadOtherProfile(Number(pid));
     } else if (!isOtherProfileView) {
       loadPhotos();
     }
@@ -345,8 +422,9 @@ export default function ProfileScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    if (isOtherProfileView && params.profileId) {
-      await loadOtherProfile(Number(params.profileId));
+    const pid = getParamValue(params.profileId);
+    if (isOtherProfileView && pid) {
+      await loadOtherProfile(Number(pid));
     } else {
       await refreshUser();
       await loadPhotos();
@@ -394,11 +472,6 @@ export default function ProfileScreen() {
   };
 
   const handleGenerateBiodata = async () => {
-    if (!fatherName.trim() || !motherName.trim()) {
-      Alert.alert("Required Info", "Please enter Father's and Mother's name.");
-      return;
-    }
-
     try {
       setGeneratingBiodata(true);
       const dobStr = profile?.dateOfBirth
@@ -411,13 +484,11 @@ export default function ProfileScreen() {
           profile?.maritalStatus || "never_married"
         ).toLowerCase() as any,
         dateOfBirth: dobStr,
-        city: profile?.city || "Pune",
-        profession: profile?.profession || "Software Engineer",
-        education: profile?.education || "B.Tech",
-        religion: religion,
-        caste: caste,
-        fatherName: fatherName,
-        motherName: motherName,
+        city: profile?.city || undefined,
+        profession: profile?.profession || undefined,
+        education: profile?.education || undefined,
+        fatherName: fatherName || undefined,
+        motherName: motherName || undefined,
         bio: profile?.bio || ownBio,
       };
 
@@ -455,21 +526,7 @@ export default function ProfileScreen() {
   };
 
   const handleUpdateBiodata = () => {
-    Alert.alert(
-      "Update Biodata",
-      "Choose how you want to update your matrimonial biodata PDF:",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Upload New PDF",
-          onPress: () => handleUploadBiodata(),
-        },
-        {
-          text: "Generate New PDF",
-          onPress: () => setShowGenerateModal(true),
-        },
-      ],
-    );
+    setShowUpdateModal(true);
   };
 
   const handleConnectPress = async () => {
@@ -563,14 +620,15 @@ export default function ProfileScreen() {
 
   const handleDeclinePress = async () => {
     if (!interestId) return;
-    const targetUserId = Number(params.profileId);
+    const pid = getParamValue(params.profileId);
+    const targetUserId = pid ? Number(pid) : 0;
     try {
       await interestApi.cancelInterest(interestId);
       Alert.alert("Success", "Connection request declined.");
       setInterestStatus(null);
       setIsInterestSender(false);
       setInterestId(null);
-      loadOtherProfile(targetUserId);
+      if (targetUserId) loadOtherProfile(targetUserId);
     } catch (err: any) {
       Alert.alert("Error", err.message || "Failed to decline request.");
     }
@@ -673,14 +731,14 @@ export default function ProfileScreen() {
   // Parse other interests (could be passed as JSON string or comma-separated string)
   const getOtherInterests = (): string[] => {
     const rawInterest = getParamValue(params.interest);
-    if (!rawInterest) return ["Travel", "Music", "Fitness"];
+    if (!rawInterest) return [];
     try {
       if (rawInterest.startsWith("[")) {
         return JSON.parse(rawInterest);
       }
       return rawInterest.split(",");
     } catch {
-      return ["Travel", "Music", "Fitness"];
+      return [];
     }
   };
 
@@ -701,11 +759,9 @@ export default function ProfileScreen() {
     ? otherUser?.profile?.profession || otherRole
     : ownRole;
   const displayBio = isOtherProfileView
-    ? otherUser?.profile?.bio || otherBio
+    ? otherUser?.profile?.bio || getParamValue(params.bio) || ""
     : ownBio;
-  const displayAbout = isOtherProfileView
-    ? otherUser?.profile?.bio || otherAbout
-    : "Passionate about technology, startups, and fitness. I value emotional maturity and authenticity.";
+  const displayAbout = displayBio;
   const displayEducation = isOtherProfileView
     ? otherUser?.profile?.education || otherEducation
     : ownEducation;
@@ -720,6 +776,25 @@ export default function ProfileScreen() {
           .join(", ")
       : otherCity
     : ownCity;
+  const displayPersonalInfo = isOtherProfileView
+    ? (otherUser?.personalInformation ||
+       (otherUser as any)?.user?.personalInformation ||
+       (otherUser as any)?.personalInfo ||
+       (otherUser as any)?.data?.personalInformation)
+    : (personalInfo || user?.personalInformation);
+
+  const activeSuccessStory = isOtherProfileView
+    ? otherUser?.successStory?.title
+      ? otherUser.successStory
+      : null
+    : user?.successStory?.title
+      ? user.successStory
+      : mySuccessStory?.title
+        ? mySuccessStory
+        : null;
+
+  const isConnected = isOtherProfileView ? interestStatus === "ACCEPTED" : true;
+
   const displayImage = isOtherProfileView
     ? otherUser?.profile?.profilePhoto
       ? getPhotoUrl(otherUser.profile.profilePhoto)
@@ -800,6 +875,44 @@ export default function ProfileScreen() {
     return cleanP !== cleanProfile;
   });
 
+  if (isOtherProfileView && (loadingOtherProfile || !otherUser)) {
+    return (
+      <View
+        style={[styles.mainContainer, { backgroundColor: colors.background }]}
+      >
+        <SafeAreaView style={styles.container}>
+          <View style={styles.topBar}>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={styles.backBtn}
+            >
+              <Ionicons name="arrow-back" size={22} color={colors.text} />
+            </TouchableOpacity>
+            <ThemedText style={styles.topBarTitle}>
+              {""}
+            </ThemedText>
+            <View style={{ width: 40 }} />
+          </View>
+          <View
+            style={{
+              flex: 1,
+              justifyContent: "center",
+              alignItems: "center",
+              gap: 14,
+            }}
+          >
+            <ActivityIndicator size="large" color="#FF4D8D" />
+            <ThemedText
+              style={{ fontSize: 13, color: colors.muted, fontWeight: "500" }}
+            >
+              Loading Profile...
+            </ThemedText>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
   return (
     <View
       style={[styles.mainContainer, { backgroundColor: colors.background }]}
@@ -831,7 +944,7 @@ export default function ProfileScreen() {
               <View style={{ width: 40 }} />
             )}
             <ThemedText style={styles.topBarTitle}>
-              {isOtherProfileView ? displayName : t("myProfile")}
+              {""}
             </ThemedText>
             {!isOtherProfileView ? (
               <TouchableOpacity
@@ -1221,7 +1334,6 @@ export default function ProfileScreen() {
                     </View>
                   </TouchableOpacity>
                 )} */}
-
                 {displayInterests && displayInterests.length > 0 && (
                   <View style={styles.infoExpandInterests}>
                     <ThemedText
@@ -1246,55 +1358,188 @@ export default function ProfileScreen() {
               </View>
             )}
 
-            {/* Biodata row — own profile: upload/edit; other profile: view if available */}
-            {isOtherProfileView ? (
-              hasBiodata ? (
+            {/* ── Personal & Family Information Section (Matching expand look as See More Information) ── */}
+            {isConnected && (
+              <>
                 <TouchableOpacity
                   style={[
-                    styles.biodataRow,
-                    {
-                      borderColor: colors.border,
-                      backgroundColor: colors.card,
-                    },
+                    styles.seeMoreBtn,
+                    { borderColor: colors.border, backgroundColor: colors.card, marginTop: 4 },
                   ]}
-                  onPress={handleViewBiodata}
+                  onPress={() => setShowPersonalInfoExpand(!showPersonalInfoExpand)}
                   activeOpacity={0.75}
                 >
-                  <View style={styles.detailLeft}>
-                    <View style={styles.biodataIconDot}>
-                      <Ionicons
-                        name="document-text-outline"
-                        size={16}
-                        color="#FF4D8D"
-                      />
-                    </View>
-                    <View>
-                      <ThemedText
-                        style={[styles.detailLabel, { color: colors.text }]}
-                      >
-                        Biodata
-                      </ThemedText>
-                      <ThemedText
-                        style={{
-                          fontSize: 11,
-                          color: colors.muted,
-                          marginTop: 2,
-                        }}
-                      >
-                        {biodataObj?.isGenerated
-                          ? "Generated PDF · tap to view"
-                          : "Uploaded PDF · tap to view"}
-                      </ThemedText>
-                    </View>
-                  </View>
                   <Ionicons
-                    name="chevron-forward"
+                    name="people-outline"
+                    size={16}
+                    color="#FF4D8D"
+                  />
+                  <ThemedText
+                    style={[styles.seeMoreBtnText, { color: colors.text }]}
+                  >
+                    Personal &amp; Family Information
+                  </ThemedText>
+                  <Ionicons
+                    name={showPersonalInfoExpand ? "chevron-up" : "chevron-down"}
                     size={16}
                     color={colors.muted}
                   />
                 </TouchableOpacity>
-              ) : null
-            ) : (
+
+                {showPersonalInfoExpand && (
+                  <View
+                    style={[
+                      styles.infoExpandCard,
+                      { backgroundColor: colors.card, borderColor: colors.border },
+                    ]}
+                  >
+                    {(() => {
+                      const pi = displayPersonalInfo || {};
+                      const targetProfile = isOtherProfileView ? (otherUser?.profile || (otherUser as any)?.user?.profile) : user?.profile;
+                      const targetUserObj = isOtherProfileView ? ((otherUser as any)?.user || otherUser) : user;
+
+                      const targetDob = pi.dateOfBirth
+                        ? String(pi.dateOfBirth).split("T")[0]
+                        : targetProfile?.dateOfBirth
+                          ? String(targetProfile.dateOfBirth).split("T")[0]
+                          : undefined;
+
+                      const targetEmail = pi.email || (targetUserObj as any)?.email;
+                      const targetAddress = pi.address;
+                      const targetCity = pi.city || targetProfile?.city;
+                      const targetState = pi.state || targetProfile?.state;
+                      const targetReligion = pi.religion || (targetProfile as any)?.religion;
+                      const targetCaste = pi.caste || (targetProfile as any)?.caste;
+                      const targetFatherName = pi.fatherName || fatherName;
+                      const targetFatherMobile = pi.fatherMobileNumber || (pi as any)?.fatherMobile;
+                      const targetFatherOcc = pi.fatherOccupation;
+                      const targetMotherName = pi.motherName || motherName;
+                      const targetMotherOcc = pi.motherOccupation;
+
+                      const numBrothers = pi.numberOfBrothers !== undefined && pi.numberOfBrothers !== null ? pi.numberOfBrothers : (pi as any)?.numberOfBrothers;
+                      const marriedBrothers = pi.marriedBrothers !== undefined && pi.marriedBrothers !== null ? pi.marriedBrothers : (pi as any)?.marriedBrothers;
+
+                      const brothersVal =
+                        numBrothers !== undefined && numBrothers !== null
+                          ? `${numBrothers} (${marriedBrothers || 0} married)`
+                          : undefined;
+
+                      const numSisters = pi.numberOfSisters !== undefined && pi.numberOfSisters !== null ? pi.numberOfSisters : (pi as any)?.numberOfSisters;
+                      const marriedSisters = pi.marriedSisters !== undefined && pi.marriedSisters !== null ? pi.marriedSisters : (pi as any)?.marriedSisters;
+
+                      const sistersVal =
+                        numSisters !== undefined && numSisters !== null
+                          ? `${numSisters} (${marriedSisters || 0} married)`
+                          : undefined;
+
+                      const items = [
+                        { icon: "calendar-outline" as const, label: "Date of Birth", value: targetDob },
+                        { icon: "mail-outline" as const, label: "Email", value: targetEmail },
+                        { icon: "home-outline" as const, label: "Address", value: targetAddress },
+                        { icon: "location-outline" as const, label: "City", value: targetCity },
+                        { icon: "map-outline" as const, label: "State", value: targetState },
+                        { icon: "flower-outline" as const, label: "Religion", value: targetReligion },
+                        { icon: "bookmarks-outline" as const, label: "Caste", value: targetCaste },
+                        { icon: "man-outline" as const, label: "Father's Name", value: targetFatherName },
+                        { icon: "call-outline" as const, label: "Father's Mobile", value: targetFatherMobile },
+                        { icon: "briefcase-outline" as const, label: "Father's Occupation", value: targetFatherOcc },
+                        { icon: "woman-outline" as const, label: "Mother's Name", value: targetMotherName },
+                        { icon: "briefcase-outline" as const, label: "Mother's Occupation", value: targetMotherOcc },
+                        { icon: "people-outline" as const, label: "Brothers", value: brothersVal },
+                        { icon: "people-outline" as const, label: "Sisters", value: sistersVal },
+                      ].filter((item) => item.value !== undefined && item.value !== null && String(item.value).trim() !== "" && String(item.value) !== "undefined");
+
+                      if (items.length === 0) {
+                        return (
+                          <View style={{ paddingVertical: 14, alignItems: "center", justifyContent: "center", gap: 6 }}>
+                            <Ionicons name="information-circle-outline" size={20} color="#FF4D8D" />
+                            <ThemedText style={{ fontSize: 13, color: colors.muted, textAlign: "center" }}>
+                              No personal or family details added yet.
+                            </ThemedText>
+                          </View>
+                        );
+                      }
+
+                      return items.map(({ icon, label, value }, idx, arr) => (
+                        <View
+                          key={idx}
+                          style={[
+                            styles.infoDialogRow,
+                            {
+                              borderBottomColor: colors.border,
+                              borderBottomWidth:
+                                idx < arr.length - 1 ? StyleSheet.hairlineWidth : 0,
+                              paddingHorizontal: 0,
+                            },
+                          ]}
+                        >
+                          <Ionicons
+                            name={icon}
+                            size={15}
+                            color="#FF4D8D"
+                            style={{ width: 22 }}
+                          />
+                          <ThemedText
+                            style={[
+                              styles.infoDialogLabel,
+                              { color: colors.textSecondary },
+                            ]}
+                          >
+                            {label}
+                          </ThemedText>
+                          <ThemedText
+                            style={[styles.infoDialogValue, { color: colors.text }]}
+                            numberOfLines={1}
+                          >
+                            {value}
+                          </ThemedText>
+                        </View>
+                      ));
+                    })()}
+
+                    {!isOtherProfileView && (
+                      <TouchableOpacity
+                        style={{
+                          marginTop: 10,
+                          paddingTop: 10,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          borderTopWidth: StyleSheet.hairlineWidth,
+                          borderTopColor: colors.border,
+                        }}
+                        onPress={() => router.push("/edit-profile")}
+                      >
+                        <ThemedText style={{ fontSize: 12.5, color: "#FF4D8D", fontWeight: "700" }}>
+                          Edit Personal &amp; Family Information
+                        </ThemedText>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+              </>
+            )}
+
+            {/* Privacy Lock Banner for Unconnected Profiles */}
+            {isOtherProfileView && !isConnected && (
+              <View style={[styles.biodataRow, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 14, paddingVertical: 14 }]}>
+                <View style={styles.detailLeft}>
+                  <View style={[styles.biodataIconDot, { backgroundColor: "rgba(255,77,141,0.12)" }]}>
+                    <Ionicons name="lock-closed-outline" size={16} color="#FF4D8D" />
+                  </View>
+                  <View style={{ flex: 1, paddingRight: 10 }}>
+                    <ThemedText style={[styles.detailLabel, { color: colors.text }]}>
+                      Private Information Locked
+                    </ThemedText>
+                    <ThemedText style={{ fontSize: 11, color: colors.muted, marginTop: 2, lineHeight: 16 }}>
+                      Biodata PDF & Family Information are accessible once your connection request is accepted.
+                    </ThemedText>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* Biodata row — visible to owner or connected friends */}
+            {isConnected && (
               <TouchableOpacity
                 style={[
                   styles.biodataRow,
@@ -1332,61 +1577,128 @@ export default function ProfileScreen() {
                     </ThemedText>
                   </View>
                 </View>
-                {hasBiodata ? (
-                  <TouchableOpacity
-                    style={[
-                      styles.biodataRoundBtn,
-                      { backgroundColor: "rgba(255,77,141,0.12)" },
-                    ]}
-                    onPress={(e) => {
-                      e.stopPropagation?.();
-                      setShowUpdateModal(true);
-                    }}
-                  >
-                    <Ionicons name="create-outline" size={14} color="#FF4D8D" />
-                  </TouchableOpacity>
-                ) : (
-                  <View style={{ flexDirection: "row", gap: 6 }}>
+                {!isOtherProfileView ? (
+                  hasBiodata ? (
                     <TouchableOpacity
-                      style={styles.biodataMiniBtn}
-                      onPress={handleUploadBiodata}
-                      disabled={uploadingBiodata}
+                      style={[
+                        styles.biodataRoundBtn,
+                        { backgroundColor: "rgba(255, 77, 141, 0.12)", borderColor: "rgba(255, 77, 141, 0.3)", borderWidth: 1 },
+                      ]}
+                      onPress={(e) => {
+                        e.stopPropagation?.();
+                        handleUpdateBiodata();
+                      }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      activeOpacity={0.8}
                     >
-                      {uploadingBiodata ? (
-                        <ActivityIndicator color="#FF4D8D" size="small" />
-                      ) : (
-                        <>
-                          <Ionicons
-                            name="cloud-upload-outline"
-                            size={11}
-                            color="#FF4D8D"
-                          />
-                          <ThemedText style={styles.biodataMiniBtnText}>
-                            Upload
-                          </ThemedText>
-                        </>
-                      )}
+                      <Ionicons name="pencil-sharp" size={15} color="#FF4D8D" />
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.biodataMiniBtn, styles.biodataMiniBtnPink]}
-                      onPress={() => setShowGenerateModal(true)}
-                    >
-                      <Ionicons
-                        name="sparkles-outline"
-                        size={11}
-                        color="#fff"
-                      />
-                      <ThemedText
-                        style={[styles.biodataMiniBtnText, { color: "#fff" }]}
+                  ) : (
+                    <View style={{ flexDirection: "row", gap: 6 }}>
+                      <TouchableOpacity
+                        style={styles.biodataMiniBtn}
+                        onPress={handleUploadBiodata}
                       >
-                        Create
-                      </ThemedText>
-                    </TouchableOpacity>
-                  </View>
+                        <Ionicons
+                          name="cloud-upload-outline"
+                          size={11}
+                          color={colors.text}
+                        />
+                        <ThemedText style={styles.biodataMiniBtnText}>
+                          Upload
+                        </ThemedText>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.biodataMiniBtn, styles.biodataMiniBtnPink]}
+                        onPress={() => setShowGenerateModal(true)}
+                      >
+                        <Ionicons
+                          name="sparkles-outline"
+                          size={11}
+                          color="#fff"
+                        />
+                        <ThemedText
+                          style={[styles.biodataMiniBtnText, { color: "#fff" }]}
+                        >
+                          Create
+                        </ThemedText>
+                      </TouchableOpacity>
+                    </View>
+                  )
+                ) : (
+                  hasBiodata ? (
+                    <Ionicons
+                      name="chevron-forward"
+                      size={16}
+                      color={colors.muted}
+                    />
+                  ) : null
                 )}
               </TouchableOpacity>
             )}
           </View>
+
+          {/* ── Success Story Section (Only render if user has added a success story) ── */}
+          {activeSuccessStory ? (
+            <>
+              <View style={[styles.sectionDivider, { borderColor: colors.border }]} />
+              <View style={{ paddingHorizontal: 20, marginVertical: 12 }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <ThemedText style={{ fontSize: 16 }}>💍</ThemedText>
+                    <ThemedText style={{ fontSize: 14, fontWeight: "700", color: colors.text }}>
+                      Success Story
+                    </ThemedText>
+                  </View>
+                  {!isOtherProfileView && (
+                    <TouchableOpacity
+                      style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+                      onPress={() => router.push("/success-stories")}
+                    >
+                      <Ionicons name="eye-outline" size={16} color="#FF4D8D" />
+                      <ThemedText style={{ fontSize: 12, fontWeight: "600", color: "#FF4D8D" }}>
+                        View All
+                      </ThemedText>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <View style={{ backgroundColor: colors.card, borderRadius: 16, padding: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <View style={{ flex: 1 }}>
+                      <ThemedText style={{ fontSize: 14, fontWeight: "700", color: colors.text }}>
+                        {activeSuccessStory.title}
+                      </ThemedText>
+                      {activeSuccessStory.partnerName ? (
+                        <ThemedText style={{ fontSize: 12, color: "#FF4D8D", marginTop: 2, fontWeight: "600" }}>
+                          ❤️ Married with {activeSuccessStory.partnerName}
+                        </ThemedText>
+                      ) : null}
+                    </View>
+                    {!isOtherProfileView && (
+                      <View style={{ flexDirection: "row", gap: 8 }}>
+                        <TouchableOpacity
+                          style={{ padding: 6, borderRadius: 8, backgroundColor: "rgba(255,77,141,0.1)" }}
+                          onPress={() => router.push("/success-stories")}
+                        >
+                          <Ionicons name="add" size={16} color="#FF4D8D" />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={{ padding: 6, borderRadius: 8, backgroundColor: "rgba(211,47,47,0.1)" }}
+                          onPress={handleDeleteSuccessStory}
+                        >
+                          <Ionicons name="trash-outline" size={14} color="#D32F2F" />
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                  <ThemedText style={{ fontSize: 12.5, color: colors.textSecondary, marginTop: 8, fontStyle: "italic", lineHeight: 18 }} numberOfLines={4}>
+                    "{activeSuccessStory.story}"
+                  </ThemedText>
+                </View>
+              </View>
+            </>
+          ) : null}
 
           {/* ── Divider ── */}
           <View
@@ -1539,11 +1851,16 @@ export default function ProfileScreen() {
                   { borderBottomColor: colors.border },
                 ]}
               >
-                <ThemedText style={styles.modalTitle}>
-                  Generate Matrimony PDF
-                </ThemedText>
+                <View>
+                  <ThemedText style={styles.modalTitle}>
+                    Generate Biodata PDF
+                  </ThemedText>
+                  <ThemedText style={[styles.verifySubtitle, { color: colors.muted }]}>
+                    Review your saved information
+                  </ThemedText>
+                </View>
                 <TouchableOpacity onPress={() => setShowGenerateModal(false)}>
-                  <Ionicons name="close" size={24} color={colors.text} />
+                  <Ionicons name="close" size={22} color={colors.text} />
                 </TouchableOpacity>
               </View>
 
@@ -1551,110 +1868,82 @@ export default function ProfileScreen() {
                 contentContainerStyle={styles.modalForm}
                 showsVerticalScrollIndicator={false}
               >
-                <ThemedText style={styles.formSectionTitle}>
-                  Personal Info (Prefilled)
+                {/* Profile Details */}
+                <ThemedText style={[styles.verifySectionLabel, { color: "#FF4D8D" }]}>
+                  Profile Details
                 </ThemedText>
-                <View
-                  style={[
-                    styles.prefilledRow,
-                    { backgroundColor: colors.card2 },
-                  ]}
-                >
-                  <ThemedText style={styles.prefilledLabel}>
-                    Name: {displayName}
-                  </ThemedText>
-                </View>
-                <View
-                  style={[
-                    styles.prefilledRow,
-                    { backgroundColor: colors.card2 },
-                  ]}
-                >
-                  <ThemedText style={styles.prefilledLabel}>
-                    Age: {displayAge} yrs
-                  </ThemedText>
+                <View style={[styles.verifyInfoCard, { backgroundColor: colors.card2, borderColor: colors.border }]}>
+                  {[
+                    { label: "Name", value: ownName },
+                    { label: "Age", value: ownAge ? `${ownAge} yrs` : "—" },
+                    { label: "Gender", value: profile?.gender || "—" },
+                    { label: "City", value: profile?.city || "—" },
+                    { label: "Profession", value: profile?.profession || "—" },
+                    { label: "Education", value: profile?.education || "—" },
+                  ].map((item, i, arr) => (
+                    <View
+                      key={item.label}
+                      style={[
+                        styles.verifyInfoRow,
+                        i < arr.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+                      ]}
+                    >
+                      <ThemedText style={[styles.verifyInfoLabel, { color: colors.muted }]}>{item.label}</ThemedText>
+                      <ThemedText style={[styles.verifyInfoValue, { color: colors.text }]}>{item.value}</ThemedText>
+                    </View>
+                  ))}
                 </View>
 
-                <ThemedText style={styles.formSectionTitle}>
-                  Matrimonial Details
+                {/* Family Details */}
+                <ThemedText style={[styles.verifySectionLabel, { color: "#FF4D8D" }]}>
+                  Personal &amp; Family Information
                 </ThemedText>
+                <View style={[styles.verifyInfoCard, { backgroundColor: colors.card2, borderColor: colors.border }]}>
+                  {[
+                    { label: "Father's Name", value: displayPersonalInfo?.fatherName || "—" },
+                    { label: "Father's Occupation", value: displayPersonalInfo?.fatherOccupation || "—" },
+                    { label: "Mother's Name", value: displayPersonalInfo?.motherName || "—" },
+                    { label: "Mother's Occupation", value: displayPersonalInfo?.motherOccupation || "—" },
+                    { label: "Brothers", value: displayPersonalInfo?.numberOfBrothers !== undefined ? `${displayPersonalInfo.numberOfBrothers} (${displayPersonalInfo.marriedBrothers || 0} married)` : "—" },
+                    { label: "Sisters", value: displayPersonalInfo?.numberOfSisters !== undefined ? `${displayPersonalInfo.numberOfSisters} (${displayPersonalInfo.marriedSisters || 0} married)` : "—" },
+                    { label: "Address", value: displayPersonalInfo?.address || "—" },
+                    { label: "City", value: displayPersonalInfo?.city || "—" },
+                    { label: "State", value: displayPersonalInfo?.state || "—" },
+                  ].map((item, i, arr) => (
+                    <View
+                      key={item.label}
+                      style={[
+                        styles.verifyInfoRow,
+                        i < arr.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+                      ]}
+                    >
+                      <ThemedText style={[styles.verifyInfoLabel, { color: colors.muted }]}>{item.label}</ThemedText>
+                      <ThemedText style={[styles.verifyInfoValue, { color: colors.text }]}>{item.value}</ThemedText>
+                    </View>
+                  ))}
+                </View>
 
-                <ThemedText style={styles.inputLabel}>Religion</ThemedText>
-                <TextInput
-                  style={[
-                    styles.textInput,
-                    {
-                      backgroundColor: colors.inputBg,
-                      color: colors.text,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  value={religion}
-                  onChangeText={setReligion}
-                  placeholder="e.g. Hindu"
-                  placeholderTextColor="#777"
-                />
-
-                <ThemedText style={styles.inputLabel}>Caste</ThemedText>
-                <TextInput
-                  style={[
-                    styles.textInput,
-                    {
-                      backgroundColor: colors.inputBg,
-                      color: colors.text,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  value={caste}
-                  onChangeText={setCaste}
-                  placeholder="e.g. Vasudev"
-                  placeholderTextColor="#777"
-                />
-
-                <ThemedText style={styles.inputLabel}>Fathers Name</ThemedText>
-                <TextInput
-                  style={[
-                    styles.textInput,
-                    {
-                      backgroundColor: colors.inputBg,
-                      color: colors.text,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  value={fatherName}
-                  onChangeText={setFatherName}
-                  placeholder="e.g. Rajesh Sharma"
-                  placeholderTextColor="#777"
-                />
-
-                <ThemedText style={styles.inputLabel}>Mother's Name</ThemedText>
-                <TextInput
-                  style={[
-                    styles.textInput,
-                    {
-                      backgroundColor: colors.inputBg,
-                      color: colors.text,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  value={motherName}
-                  onChangeText={setMotherName}
-                  placeholder="e.g. Sunita Sharma"
-                  placeholderTextColor="#777"
-                />
+                {(!displayPersonalInfo?.fatherName || !displayPersonalInfo?.motherName) && (
+                  <View style={[styles.verifyMissingNote, { backgroundColor: "rgba(255,77,141,0.08)", borderColor: "rgba(255,77,141,0.25)" }]}>
+                    <Ionicons name="information-circle-outline" size={14} color="#FF4D8D" />
+                    <ThemedText style={[styles.verifyMissingText, { color: "#FF4D8D" }]}>
+                      Some details are missing. Update them in Edit Profile → Family &amp; Personal Details.
+                    </ThemedText>
+                  </View>
+                )}
 
                 <TouchableOpacity
-                  style={styles.submitGenerateButton}
+                  style={[styles.submitGenerateButton, generatingBiodata && { opacity: 0.7 }]}
                   onPress={handleGenerateBiodata}
                   disabled={generatingBiodata}
                 >
                   {generatingBiodata ? (
-                    <ActivityIndicator color="#fff" />
+                    <ActivityIndicator color="#fff" size="small" />
                   ) : (
                     <>
                       <Ionicons name="sparkles" size={18} color="#fff" />
                       <ThemedText style={styles.submitGenerateButtonText}>
-                        Compile & Save PDF
+                        ✨ Generate &amp; Save Biodata PDF
                       </ThemedText>
                     </>
                   )}
@@ -1717,7 +2006,7 @@ export default function ProfileScreen() {
                   </View>
                   <View style={styles.updateOptionInfo}>
                     <ThemedText style={styles.updateOptionTitle}>
-                      Upload New PDF
+                      Update new PDF
                     </ThemedText>
                     <ThemedText style={styles.updateOptionSub}>
                       Choose a compiled PDF file from your device
@@ -1754,7 +2043,7 @@ export default function ProfileScreen() {
                   </View>
                   <View style={styles.updateOptionInfo}>
                     <ThemedText style={styles.updateOptionTitle}>
-                      Generate New PDF
+                      Generate new PDF
                     </ThemedText>
                     <ThemedText style={styles.updateOptionSub}>
                       Instantly build a fresh PDF from your details
@@ -2042,63 +2331,84 @@ const styles = StyleSheet.create({
   heroSection: {
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 24,
+    paddingTop: 8,
+    paddingBottom: 10,
   },
   avatarRing: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 2.5,
+    width: 86,
+    height: 86,
+    borderRadius: 43,
+    borderWidth: 2,
     borderColor: "#FF4D8D",
-    padding: 3,
-    marginBottom: 14,
+    padding: 2,
+    marginBottom: 8,
   },
   heroAvatar: {
     width: "100%",
     height: "100%",
-    borderRadius: 50,
+    borderRadius: 43,
+  },
+  detailCard: {
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginHorizontal: 20,
+    marginBottom: 12,
+  },
+  detailHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  detailCardTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  detailDivider: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginVertical: 8,
   },
   heroNameRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 4,
+    marginBottom: 2,
   },
   heroName: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "800",
     letterSpacing: -0.3,
   },
   heroSub: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: "500",
-    marginBottom: 10,
+    marginBottom: 4,
   },
   heroBio: {
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 12.5,
+    lineHeight: 18,
     textAlign: "center",
     paddingHorizontal: 12,
-    marginBottom: 14,
+    marginBottom: 8,
   },
   quickChipsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "center",
-    gap: 6,
-    marginBottom: 10,
+    gap: 5,
+    marginBottom: 6,
   },
   quickChip: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 100,
     borderWidth: StyleSheet.hairlineWidth,
   },
   quickChipText: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: "600",
     maxWidth: 100,
   },
@@ -2106,17 +2416,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "center",
-    gap: 6,
-    marginBottom: 14,
+    gap: 5,
+    marginBottom: 8,
   },
   interestTag: {
     backgroundColor: "rgba(255,77,141,0.10)",
     borderRadius: 100,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
   interestTagText: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: "600",
     color: "#FF4D8D",
   },
@@ -2124,7 +2434,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    marginTop: 6,
+    marginTop: 4,
     width: "100%",
   },
   matchBadge: {
@@ -2164,7 +2474,7 @@ const styles = StyleSheet.create({
 
   // ── Full-width connect button (other profile) ──
   connectSection: {
-    paddingVertical: 14,
+    paddingVertical: 6,
     alignItems: "center",
   },
   connectBtnFull: {
@@ -2284,6 +2594,16 @@ const styles = StyleSheet.create({
   },
   infoExpandInterests: {
     paddingTop: 10,
+  },
+  biodataRoundBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,77,141,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,77,141,0.3)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   biodataRow: {
     flexDirection: "row",
@@ -2527,14 +2847,6 @@ const styles = StyleSheet.create({
   noPhotosText: { fontSize: 13 },
 
   // ── Biodata buttons (kept, used in detailsSection) ──
-  biodataRoundBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#FF4D8D",
-    justifyContent: "center",
-    alignItems: "center",
-  },
   biodataMiniBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -3035,5 +3347,56 @@ const styles = StyleSheet.create({
     height: 36,
     justifyContent: "center",
     alignItems: "center",
+  },
+
+  // ── Verification Modal Styles ──
+  verifySubtitle: {
+    fontSize: 11,
+    marginTop: 2,
+    opacity: 0.7,
+  },
+  verifySectionLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    marginBottom: 6,
+    marginTop: 14,
+  },
+  verifyInfoCard: {
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: "hidden",
+  },
+  verifyInfoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  verifyInfoLabel: {
+    fontSize: 12,
+    flex: 1,
+  },
+  verifyInfoValue: {
+    fontSize: 12,
+    fontWeight: "600",
+    flex: 1.5,
+    textAlign: "right",
+  },
+  verifyMissingNote: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 12,
+  },
+  verifyMissingText: {
+    fontSize: 11,
+    flex: 1,
+    lineHeight: 16,
   },
 });

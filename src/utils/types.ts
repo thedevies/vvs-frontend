@@ -9,6 +9,8 @@ export interface User {
   profile?: UserProfile | null;
   photos?: UserPhoto[];
   biodata?: Biodata | null;
+  personalInformation?: any;
+  successStory?: any;
   createdAt: string;
   updatedAt: string;
 }

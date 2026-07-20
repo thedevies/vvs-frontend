@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { router } from 'expo-router';
 import {
   ActivityIndicator,
@@ -23,7 +23,7 @@ import CustomButton from '@/components/ui/CustomButton';
 import CustomInput from '@/components/ui/CustomInput';
 import { ThemedText } from '@/components/themed-text';
 import { useAuth } from '@/context/AuthContext';
-import { profileApi, BASE_URL } from '@/utils/api';
+import { profileApi, personalInformationApi, BASE_URL } from '@/utils/api';
 import { useAppTheme } from '@/context/ThemeContext';
 
 type Gender = 'male' | 'female';
@@ -117,6 +117,9 @@ export default function EditProfileScreen() {
     profile?.dateOfBirth ? profile.dateOfBirth.split('T')[0] : ''
   );
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string | null>(
+    profile?.profilePhoto || null
+  );
   const [loading, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [error, setError] = useState('');
@@ -127,10 +130,71 @@ export default function EditProfileScreen() {
   const [uploadingBiodata, setUploadingBiodata] = useState(false);
   const [generatingBiodata, setGeneratingBiodata] = useState(false);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [religion, setReligion] = useState('Hindu');
   const [caste, setCaste] = useState('Vasudev');
   const [fatherName, setFatherName] = useState('');
   const [motherName, setMotherName] = useState('');
+
+  // Personal Information states
+  const initialPi = user?.personalInformation as any;
+  const [piExists, setPiExists] = useState(!!initialPi);
+  const [piEmail, setPiEmail] = useState(initialPi?.email || '');
+  const [piAddress, setPiAddress] = useState(initialPi?.address || '');
+  const [piCity, setPiCity] = useState(initialPi?.city || '');
+  const [piState, setPiState] = useState(initialPi?.state || '');
+  const [piFatherName, setPiFatherName] = useState(initialPi?.fatherName || '');
+  const [piFatherMobile, setPiFatherMobile] = useState(initialPi?.fatherMobileNumber || '');
+  const [piFatherOccupation, setPiFatherOccupation] = useState(initialPi?.fatherOccupation || '');
+  const [piMotherName, setPiMotherName] = useState(initialPi?.motherName || '');
+  const [piMotherOccupation, setPiMotherOccupation] = useState(initialPi?.motherOccupation || '');
+  const [piNumBrothers, setPiNumBrothers] = useState(initialPi?.numberOfBrothers != null ? String(initialPi.numberOfBrothers) : '');
+  const [piMarriedBrothers, setPiMarriedBrothers] = useState(initialPi?.marriedBrothers != null ? String(initialPi.marriedBrothers) : '');
+  const [piNumSisters, setPiNumSisters] = useState(initialPi?.numberOfSisters != null ? String(initialPi.numberOfSisters) : '');
+  const [piMarriedSisters, setPiMarriedSisters] = useState(initialPi?.marriedSisters != null ? String(initialPi.marriedSisters) : '');
+
+  const populatePersonalInfo = useCallback((pi: any) => {
+    if (!pi) return;
+    if (pi.fatherName || pi.motherName || pi.address || pi.email || pi.city) {
+      setPiExists(true);
+      if (pi.email != null) setPiEmail(pi.email);
+      if (pi.address != null) setPiAddress(pi.address);
+      if (pi.city != null) setPiCity(pi.city);
+      if (pi.state != null) setPiState(pi.state);
+      if (pi.fatherName != null) setPiFatherName(pi.fatherName);
+      if (pi.fatherMobileNumber != null) setPiFatherMobile(pi.fatherMobileNumber);
+      if (pi.fatherOccupation != null) setPiFatherOccupation(pi.fatherOccupation);
+      if (pi.motherName != null) setPiMotherName(pi.motherName);
+      if (pi.motherOccupation != null) setPiMotherOccupation(pi.motherOccupation);
+      if (pi.numberOfBrothers != null) setPiNumBrothers(String(pi.numberOfBrothers));
+      if (pi.marriedBrothers != null) setPiMarriedBrothers(String(pi.marriedBrothers));
+      if (pi.numberOfSisters != null) setPiNumSisters(String(pi.numberOfSisters));
+      if (pi.marriedSisters != null) setPiMarriedSisters(String(pi.marriedSisters));
+    }
+  }, []);
+
+  // 1. Instantly populate from AuthContext on mount or when user updates
+  useEffect(() => {
+    if (user?.personalInformation) {
+      populatePersonalInfo(user.personalInformation);
+    }
+  }, [user?.personalInformation, populatePersonalInfo]);
+
+  // 2. Fetch in background to sync any server updates
+  useEffect(() => {
+    const loadPersonalInfo = async () => {
+      try {
+        const res = await personalInformationApi.getDetails();
+        const pi = res?.data || (res as any);
+        if (pi) {
+          populatePersonalInfo(pi);
+        }
+      } catch (e) {
+        console.log('[EditProfile] Failed to fetch personal info:', e);
+      }
+    };
+    loadPersonalInfo();
+  }, [populatePersonalInfo]);
 
   const biodataObj = user?.biodata;
   const hasBiodata = !!biodataObj?.biodataUrl;
@@ -172,23 +236,10 @@ export default function EditProfileScreen() {
   };
 
   const handleUpdateBiodata = () => {
-    Alert.alert(
-      'Update Biodata',
-      'Choose how you want to update your matrimonial biodata:',
-      [
-        { text: 'Upload PDF', onPress: handleUploadBiodata },
-        { text: 'Generate PDF', onPress: () => setShowGenerateModal(true) },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
+    setShowUpdateModal(true);
   };
 
   const handleGenerateSubmit = async () => {
-    if (!fatherName.trim() || !motherName.trim()) {
-      Alert.alert('Error', 'Please fill in all parental fields to generate biodata.');
-      return;
-    }
-
     try {
       setGeneratingBiodata(true);
       setShowGenerateModal(false);
@@ -202,10 +253,8 @@ export default function EditProfileScreen() {
         profession: profession.trim() || profile?.profession || undefined,
         education: education.trim() || profile?.education || undefined,
         bio: bio.trim() || profile?.bio || undefined,
-        religion: religion.trim(),
-        caste: caste.trim(),
-        fatherName: fatherName.trim(),
-        motherName: motherName.trim(),
+        fatherName: piFatherName.trim() || undefined,
+        motherName: piMotherName.trim() || undefined,
       });
 
       if (response.data) {
@@ -243,7 +292,7 @@ export default function EditProfileScreen() {
     ? getPhotoUrl(profile.profilePhoto)
     : null;
 
-  const pickImage = async () => {
+  const pickAndUploadImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       Alert.alert('Permission Needed', 'Please allow access to your photo library.');
@@ -258,11 +307,43 @@ export default function EditProfileScreen() {
     });
 
     if (!result.canceled && result.assets[0]) {
-      setPhotoUri(result.assets[0].uri);
+      const uri = result.assets[0].uri;
+      setPhotoUri(uri);
+      // Auto-upload immediately
+      try {
+        setUploadingPhoto(true);
+        const uploadRes = await profileApi.uploadProfilePhoto(uri);
+        if (uploadRes.data?.photoUrl) {
+          setUploadedPhotoUrl(uploadRes.data.photoUrl);
+          console.log('[EditProfile] Photo auto-uploaded:', uploadRes.data.photoUrl);
+        } else {
+          Alert.alert('Upload Failed', uploadRes.message || 'Could not upload photo.');
+          setPhotoUri(null);
+        }
+      } catch (err: any) {
+        Alert.alert('Upload Error', err.message || 'Failed to upload photo. Please try again.');
+        setPhotoUri(null);
+      } finally {
+        setUploadingPhoto(false);
+      }
     }
   };
 
-  const displayImage = photoUri || existingPhotoUrl;
+  const displayImage = photoUri || existingPhotoUrl || (uploadedPhotoUrl ? (uploadedPhotoUrl.startsWith('http') ? uploadedPhotoUrl : getPhotoUrl(uploadedPhotoUrl)) : null);
+
+  const handleOpenGenerateModal = () => {
+    const hasPhoto = uploadedPhotoUrl || profile?.profilePhoto;
+    if (!hasPhoto) {
+      Alert.alert(
+        'Profile Photo Required',
+        'Please upload your profile photo before generating biodata. Your photo will appear in the PDF.',
+        [{ text: 'OK' }],
+        'error'
+      );
+      return;
+    }
+    setShowGenerateModal(true);
+  };
 
   const handleSave = async () => {
     setError('');
@@ -344,25 +425,8 @@ export default function EditProfileScreen() {
     let stage = 'photo_upload';
 
     try {
-      let uploadedPhotoUrl = profile?.profilePhoto || '';
-
-      if (photoUri) {
-        console.log('[EditProfile] Uploading profile photo first...');
-        setUploadingPhoto(true);
-        try {
-          const uploadRes = await profileApi.uploadProfilePhoto(photoUri);
-          if (uploadRes.data?.photoUrl) {
-            uploadedPhotoUrl = uploadRes.data.photoUrl;
-            console.log('[EditProfile] Profile photo uploaded successfully:', uploadedPhotoUrl);
-          } else {
-            throw new Error('Failed to upload profile photo.');
-          }
-        } catch (uploadErr: any) {
-          throw new Error(`[Profile Photo Section] ${uploadErr.message}`);
-        } finally {
-          setUploadingPhoto(false);
-        }
-      }
+      // Use already-uploaded URL (auto-uploaded on pick), or existing profile photo
+      let finalPhotoUrl = uploadedPhotoUrl || profile?.profilePhoto || '';
 
       if (!profileCompleted) {
         stage = 'profile_creation';
@@ -378,7 +442,7 @@ export default function EditProfileScreen() {
           profession: profession.trim() || undefined,
           education: education.trim() || undefined,
           bio: bio.trim(),
-          profilePhoto: uploadedPhotoUrl,
+          profilePhoto: finalPhotoUrl,
           interest: interests,
         });
 
@@ -401,7 +465,7 @@ export default function EditProfileScreen() {
           profession: profession.trim() || undefined,
           education: education.trim() || undefined,
           bio: bio.trim(),
-          profilePhoto: uploadedPhotoUrl || undefined,
+          profilePhoto: finalPhotoUrl || undefined,
           interest: interests,
         });
 
@@ -410,6 +474,51 @@ export default function EditProfileScreen() {
         Alert.alert('Success', 'Profile updated successfully!', [
           { text: 'OK', onPress: () => router.back() },
         ]);
+      }
+
+      // ── Save Personal Information (non-blocking, optional fields) ──
+      const hasAnyPiField = !!(
+        piFatherName.trim() ||
+        piMotherName.trim() ||
+        piFatherMobile.trim() ||
+        piFatherOccupation.trim() ||
+        piMotherOccupation.trim() ||
+        piEmail.trim() ||
+        piAddress.trim() ||
+        piCity.trim() ||
+        piState.trim() ||
+        piNumBrothers.trim() ||
+        piMarriedBrothers.trim() ||
+        piNumSisters.trim() ||
+        piMarriedSisters.trim()
+      );
+      if (hasAnyPiField) {
+        try {
+          const piPayload = {
+            email: piEmail.trim() || undefined,
+            address: piAddress.trim() || undefined,
+            city: piCity.trim() || undefined,
+            state: piState.trim() || undefined,
+            fatherName: piFatherName.trim() || undefined,
+            fatherMobileNumber: piFatherMobile.trim() || undefined,
+            fatherOccupation: piFatherOccupation.trim() || undefined,
+            motherName: piMotherName.trim() || undefined,
+            motherOccupation: piMotherOccupation.trim() || undefined,
+            numberOfBrothers: piNumBrothers ? parseInt(piNumBrothers, 10) : undefined,
+            marriedBrothers: piMarriedBrothers ? parseInt(piMarriedBrothers, 10) : undefined,
+            numberOfSisters: piNumSisters ? parseInt(piNumSisters, 10) : undefined,
+            marriedSisters: piMarriedSisters ? parseInt(piMarriedSisters, 10) : undefined,
+          };
+          if (piExists) {
+            await personalInformationApi.update(piPayload);
+          } else {
+            await personalInformationApi.add(piPayload);
+            setPiExists(true);
+          }
+          await refreshUser();
+        } catch (piErr: any) {
+          console.warn('[EditProfile] Personal info save failed (non-critical):', piErr?.message);
+        }
       }
     } catch (err: any) {
       console.error('[EditProfile] Save error:', err);
@@ -485,13 +594,13 @@ export default function EditProfileScreen() {
                   <ThemedText style={styles.uploadingText}>Uploading...</ThemedText>
                 </View>
               )}
-              <TouchableOpacity style={[styles.editImageBadge, { borderColor: colors.background }]} onPress={pickImage} disabled={uploadingPhoto}>
+              <TouchableOpacity style={[styles.editImageBadge, { borderColor: colors.background }]} onPress={pickAndUploadImage} disabled={uploadingPhoto}>
                 <Feather name="camera" size={18} color="#fff" />
               </TouchableOpacity>
             </View>
 
             {displayImage ? (
-              <TouchableOpacity style={styles.cropImageButton} onPress={pickImage} disabled={uploadingPhoto}>
+              <TouchableOpacity style={styles.cropImageButton} onPress={pickAndUploadImage} disabled={uploadingPhoto}>
                 <Feather name="crop" size={13} color={ACCENT} />
                 <ThemedText style={styles.cropImageButtonText}>Crop / Edit Photo</ThemedText>
               </TouchableOpacity>
@@ -707,7 +816,84 @@ export default function EditProfileScreen() {
               </View>
             </View>
 
-             {/* ── Biodata Card ── */}
+             {/* ── Personal Information Card ── */}
+            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <ThemedText style={[styles.cardTitle, { color: colors.text }]}>Family &amp; Personal Details</ThemedText>
+
+              <View style={styles.inputGroup}>
+                <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Email</ThemedText>
+                <CustomInput placeholder="Email address" value={piEmail} onChangeText={setPiEmail} keyboardType="email-address" autoCapitalize="none" />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Address</ThemedText>
+                <CustomInput placeholder="Residential address" value={piAddress} onChangeText={setPiAddress} />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>City</ThemedText>
+                <CustomInput placeholder="City" value={piCity} onChangeText={setPiCity} />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>State</ThemedText>
+                <CustomInput placeholder="State" value={piState} onChangeText={setPiState} />
+              </View>
+
+              <View style={[styles.inputGroup, { marginTop: 8 }]}>
+                <ThemedText style={[styles.inputLabel, { color: colors.textSecondary, fontWeight: '700' }]}>Father's Details</ThemedText>
+              </View>
+              <View style={styles.inputGroup}>
+                <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Father's Name</ThemedText>
+                <CustomInput placeholder="Father's full name" value={piFatherName} onChangeText={setPiFatherName} />
+              </View>
+              <View style={styles.inputGroup}>
+                <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Father's Mobile</ThemedText>
+                <CustomInput placeholder="Father's mobile number" value={piFatherMobile} onChangeText={setPiFatherMobile} keyboardType="phone-pad" />
+              </View>
+              <View style={styles.inputGroup}>
+                <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Father's Occupation</ThemedText>
+                <CustomInput placeholder="Father's occupation" value={piFatherOccupation} onChangeText={setPiFatherOccupation} />
+              </View>
+
+              <View style={[styles.inputGroup, { marginTop: 8 }]}>
+                <ThemedText style={[styles.inputLabel, { color: colors.textSecondary, fontWeight: '700' }]}>Mother's Details</ThemedText>
+              </View>
+              <View style={styles.inputGroup}>
+                <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Mother's Name</ThemedText>
+                <CustomInput placeholder="Mother's full name" value={piMotherName} onChangeText={setPiMotherName} />
+              </View>
+              <View style={styles.inputGroup}>
+                <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Mother's Occupation</ThemedText>
+                <CustomInput placeholder="Mother's occupation" value={piMotherOccupation} onChangeText={setPiMotherOccupation} />
+              </View>
+
+              <View style={[styles.inputGroup, { marginTop: 8 }]}>
+                <ThemedText style={[styles.inputLabel, { color: colors.textSecondary, fontWeight: '700' }]}>Siblings</ThemedText>
+              </View>
+              <View style={styles.siblingsRow}>
+                <View style={styles.siblingsCol}>
+                  <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Brothers</ThemedText>
+                  <CustomInput placeholder="Total" value={piNumBrothers} onChangeText={setPiNumBrothers} keyboardType="numeric" maxLength={2} />
+                </View>
+                <View style={styles.siblingsCol}>
+                  <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Married</ThemedText>
+                  <CustomInput placeholder="Married" value={piMarriedBrothers} onChangeText={setPiMarriedBrothers} keyboardType="numeric" maxLength={2} />
+                </View>
+              </View>
+              <View style={styles.siblingsRow}>
+                <View style={styles.siblingsCol}>
+                  <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Sisters</ThemedText>
+                  <CustomInput placeholder="Total" value={piNumSisters} onChangeText={setPiNumSisters} keyboardType="numeric" maxLength={2} />
+                </View>
+                <View style={styles.siblingsCol}>
+                  <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Married</ThemedText>
+                  <CustomInput placeholder="Married" value={piMarriedSisters} onChangeText={setPiMarriedSisters} keyboardType="numeric" maxLength={2} />
+                </View>
+              </View>
+            </View>
+
+            {/* ── Biodata Card ── */}
             <View style={[styles.card, styles.biodataCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <TouchableOpacity
                 style={styles.biodataPanelLeft}
@@ -764,7 +950,7 @@ export default function EditProfileScreen() {
 
                     <TouchableOpacity
                       style={[styles.biodataMiniBtn, styles.biodataMiniBtnPink]}
-                      onPress={() => setShowGenerateModal(true)}
+                      onPress={() => handleOpenGenerateModal()}
                     >
                       <Ionicons name="sparkles-outline" size={12} color="#fff" />
                       <ThemedText style={[styles.biodataMiniBtnText, { color: '#fff' }]}>Create</ThemedText>
@@ -793,56 +979,61 @@ export default function EditProfileScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-              <ThemedText style={[styles.modalTitle, { color: colors.text }]}>Generate Matrimony PDF</ThemedText>
+              <View>
+                <ThemedText style={[styles.modalTitle, { color: colors.text }]}>Generate Biodata PDF</ThemedText>
+                <ThemedText style={[styles.modalSubtitle, { color: colors.textSecondary }]}>Review your saved information</ThemedText>
+              </View>
               <TouchableOpacity onPress={() => setShowGenerateModal(false)}>
-                <Ionicons name="close" size={24} color={colors.text} />
+                <Ionicons name="close" size={22} color={colors.text} />
               </TouchableOpacity>
             </View>
 
             <ScrollView contentContainerStyle={styles.modalForm} showsVerticalScrollIndicator={false}>
-              <View style={styles.modalInputGroup}>
-                <ThemedText style={[styles.modalInputLabel, { color: colors.text }]}>Religion</ThemedText>
-                <TextInput
-                  style={[styles.modalTextInput, { backgroundColor: colors.card2 || colors.background, color: colors.text, borderColor: colors.border }]}
-                  value={religion}
-                  onChangeText={setReligion}
-                  placeholder="e.g. Hindu"
-                  placeholderTextColor={colors.muted}
-                />
+
+              {/* Profile Info Section */}
+              <ThemedText style={[styles.verifySection, { color: ACCENT }]}>Profile Details</ThemedText>
+              <View style={[styles.verifyCard, { backgroundColor: colors.card2 || colors.background, borderColor: colors.border }]}>
+                {[
+                  { label: 'Name', value: name.trim() || profile?.fullName || '—' },
+                  { label: 'Gender', value: gender || profile?.gender || '—' },
+                  { label: 'Date of Birth', value: dateOfBirth || (profile?.dateOfBirth ? profile.dateOfBirth.split('T')[0] : '—') },
+                  { label: 'City', value: city.trim() || profile?.city || '—' },
+                  { label: 'Profession', value: profession.trim() || profile?.profession || '—' },
+                  { label: 'Education', value: education.trim() || profile?.education || '—' },
+                ].map((item, i, arr) => (
+                  <View key={item.label} style={[styles.verifyRow, i < arr.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}>
+                    <ThemedText style={[styles.verifyLabel, { color: colors.textSecondary }]}>{item.label}</ThemedText>
+                    <ThemedText style={[styles.verifyValue, { color: colors.text }]}>{item.value}</ThemedText>
+                  </View>
+                ))}
               </View>
 
-              <View style={styles.modalInputGroup}>
-                <ThemedText style={[styles.modalInputLabel, { color: colors.text }]}>Caste</ThemedText>
-                <TextInput
-                  style={[styles.modalTextInput, { backgroundColor: colors.card2 || colors.background, color: colors.text, borderColor: colors.border }]}
-                  value={caste}
-                  onChangeText={setCaste}
-                  placeholder="e.g. Vasudev"
-                  placeholderTextColor={colors.muted}
-                />
+              {/* Family Info Section */}
+              <ThemedText style={[styles.verifySection, { color: ACCENT }]}>Family Details</ThemedText>
+              <View style={[styles.verifyCard, { backgroundColor: colors.card2 || colors.background, borderColor: colors.border }]}>
+                {[
+                  { label: "Father's Name", value: piFatherName || '—' },
+                  { label: "Father's Occupation", value: piFatherOccupation || '—' },
+                  { label: "Mother's Name", value: piMotherName || '—' },
+                  { label: "Mother's Occupation", value: piMotherOccupation || '—' },
+                  { label: 'Brothers', value: piNumBrothers ? `${piNumBrothers} (${piMarriedBrothers || 0} married)` : '—' },
+                  { label: 'Sisters', value: piNumSisters ? `${piNumSisters} (${piMarriedSisters || 0} married)` : '—' },
+                ].map((item, i, arr) => (
+                  <View key={item.label} style={[styles.verifyRow, i < arr.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}>
+                    <ThemedText style={[styles.verifyLabel, { color: colors.textSecondary }]}>{item.label}</ThemedText>
+                    <ThemedText style={[styles.verifyValue, { color: colors.text }]}>{item.value}</ThemedText>
+                  </View>
+                ))}
               </View>
 
-              <View style={styles.modalInputGroup}>
-                <ThemedText style={[styles.modalInputLabel, { color: colors.text }]}>Father's Full Name *</ThemedText>
-                <TextInput
-                  style={[styles.modalTextInput, { backgroundColor: colors.card2 || colors.background, color: colors.text, borderColor: colors.border }]}
-                  value={fatherName}
-                  onChangeText={setFatherName}
-                  placeholder="Father's Name"
-                  placeholderTextColor={colors.muted}
-                />
-              </View>
-
-              <View style={styles.modalInputGroup}>
-                <ThemedText style={[styles.modalInputLabel, { color: colors.text }]}>Mother's Full Name *</ThemedText>
-                <TextInput
-                  style={[styles.modalTextInput, { backgroundColor: colors.card2 || colors.background, color: colors.text, borderColor: colors.border }]}
-                  value={motherName}
-                  onChangeText={setMotherName}
-                  placeholder="Mother's Name"
-                  placeholderTextColor={colors.muted}
-                />
-              </View>
+              {(!piFatherName || !piMotherName) && (
+                <View style={[styles.verifyWarning, { backgroundColor: 'rgba(255,77,141,0.08)', borderColor: 'rgba(255,77,141,0.25)' }]}>
+                  <Ionicons name="information-circle-outline" size={15} color={ACCENT} />
+                  <ThemedText style={[styles.verifyWarningText, { color: ACCENT }]}>
+                    Some family details are missing. Add them in the Family &amp; Personal Details section below.
+                  </ThemedText>
+                </View>
+              )}
 
               <TouchableOpacity
                 style={[styles.modalSubmitBtn, generatingBiodata && { opacity: 0.7 }]}
@@ -852,10 +1043,93 @@ export default function EditProfileScreen() {
                 {generatingBiodata ? (
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (
-                  <ThemedText style={styles.modalSubmitBtnText}>Generate Biodata PDF</ThemedText>
+                  <>
+                    <Ionicons name="sparkles" size={16} color="#fff" />
+                    <ThemedText style={styles.modalSubmitBtnText}>Generate Biodata PDF</ThemedText>
+                  </>
                 )}
               </TouchableOpacity>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Update Biodata Modal */}
+      <Modal visible={showUpdateModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card, paddingBottom: 24 }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <ThemedText style={[styles.modalTitle, { color: colors.text }]}>Update Biodata</ThemedText>
+              <TouchableOpacity onPress={() => setShowUpdateModal(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Ionicons name="close" size={22} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ paddingTop: 16, gap: 12 }}>
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 14,
+                  paddingHorizontal: 16,
+                  borderRadius: 14,
+                  backgroundColor: colors.card2 || colors.background,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  gap: 12,
+                }}
+                onPress={() => {
+                  setShowUpdateModal(false);
+                  handleUploadBiodata();
+                }}
+                activeOpacity={0.8}
+              >
+                <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(30, 106, 210, 0.1)', justifyContent: 'center', alignItems: 'center' }}>
+                  <Ionicons name="cloud-upload-outline" size={18} color="#1E6AD2" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <ThemedText style={{ fontSize: 14, fontWeight: '700', color: colors.text }} numberOfLines={1}>
+                    Update new PDF
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
+                    Upload a PDF document from device
+                  </ThemedText>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 14,
+                  paddingHorizontal: 16,
+                  borderRadius: 14,
+                  backgroundColor: colors.card2 || colors.background,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  gap: 12,
+                }}
+                onPress={() => {
+                  setShowUpdateModal(false);
+                  handleOpenGenerateModal();
+                }}
+                activeOpacity={0.8}
+              >
+                <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255, 77, 141, 0.1)', justifyContent: 'center', alignItems: 'center' }}>
+                  <Ionicons name="sparkles-outline" size={18} color={ACCENT} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <ThemedText style={{ fontSize: 14, fontWeight: '700', color: colors.text }} numberOfLines={1}>
+                    Generate new PDF
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
+                    Compile fresh PDF from saved info
+                  </ThemedText>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1252,7 +1526,68 @@ const styles = StyleSheet.create({
   },
   modalSubmitBtnText: {
     color: '#fff',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
+  },
+
+  // ── Siblings Row ──
+  siblingsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 4,
+  },
+  siblingsCol: {
+    flex: 1,
+  },
+
+  // ── Verification Modal ──
+  modalSubtitle: {
+    fontSize: 11,
+    marginTop: 2,
+    opacity: 0.7,
+  },
+  verifySection: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+    marginTop: 14,
+  },
+  verifyCard: {
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+  },
+  verifyRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  verifyLabel: {
+    fontSize: 12,
+    flex: 1,
+  },
+  verifyValue: {
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1.5,
+    textAlign: 'right',
+  },
+  verifyWarning: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 12,
+  },
+  verifyWarningText: {
+    fontSize: 11,
+    flex: 1,
+    lineHeight: 16,
   },
 });

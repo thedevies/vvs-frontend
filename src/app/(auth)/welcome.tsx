@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -8,11 +8,10 @@ import {
   StyleSheet,
   TouchableOpacity,
   View,
-  Image,
+  Animated,
 } from "react-native";
 import { Feather, FontAwesome } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
-import CustomButton from "@/components/ui/CustomButton";
 import { ThemedText } from "@/components/themed-text";
 
 export default function WelcomeScreen() {
@@ -20,6 +19,26 @@ export default function WelcomeScreen() {
   const [fontsLoaded] = useFonts({
     YatraOne: require("@/assets/fonts/YatraOne-Regular.ttf"),
   });
+
+  // Bounce animation for scroll indicator
+  const bounceAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const bounce = Animated.loop(
+      Animated.sequence([
+        Animated.timing(bounceAnim, { toValue: 10, duration: 600, useNativeDriver: true }),
+        Animated.timing(bounceAnim, { toValue: 0, duration: 600, useNativeDriver: true }),
+      ])
+    );
+    bounce.start();
+    return () => bounce.stop();
+  }, []);
+
+  const handleShowLogin = () => {
+    Animated.timing(fadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+    setShowLoginOptions(true);
+  };
 
   if (!fontsLoaded) return null;
 
@@ -67,10 +86,9 @@ export default function WelcomeScreen() {
                 <TouchableOpacity
                   activeOpacity={0.85}
                   style={styles.mainLoginButton}
-                  onPress={() => setShowLoginOptions(true)}
+                  onPress={handleShowLogin}
                 >
                   <ThemedText style={styles.mainLoginText}>Log In</ThemedText>
-
                   <Feather name="arrow-right" size={20} color="#fff" />
                 </TouchableOpacity>
               ) : (
@@ -78,7 +96,10 @@ export default function WelcomeScreen() {
                   {/* Back Button */}
                   <TouchableOpacity
                     style={styles.backButton}
-                    onPress={() => setShowLoginOptions(false)}
+                    onPress={() => {
+                      Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+                      setShowLoginOptions(false);
+                    }}
                   >
                     <Feather name="arrow-left" size={22} color="#fff" />
                   </TouchableOpacity>
@@ -92,7 +113,6 @@ export default function WelcomeScreen() {
                     <View style={styles.googleIconContainer}>
                       <FontAwesome name="google" size={18} color="#EA4335" />
                     </View>
-
                     <ThemedText style={styles.googleButtonText}>
                       Continue with Google
                     </ThemedText>
@@ -107,7 +127,6 @@ export default function WelcomeScreen() {
                     <View style={styles.iconContainer}>
                       <Feather name="mail" size={18} color="#fff" />
                     </View>
-
                     <ThemedText style={styles.optionButtonText}>
                       Continue with Email
                     </ThemedText>
@@ -122,7 +141,6 @@ export default function WelcomeScreen() {
                     <View style={[styles.iconContainer, styles.mobileIconActive]}>
                       <Feather name="smartphone" size={18} color="#fff" />
                     </View>
-
                     <ThemedText style={styles.optionButtonText}>
                       Continue with Mobile
                     </ThemedText>
@@ -131,15 +149,23 @@ export default function WelcomeScreen() {
               )}
             </View>
 
+            {/* Scroll-down bounce indicator */}
+            <Animated.View
+              style={[
+                styles.scrollIndicator,
+                { opacity: fadeAnim, transform: [{ translateY: bounceAnim }] },
+              ]}
+            >
+              <Feather name="chevron-down" size={22} color="rgba(255,255,255,0.6)" />
+              <Feather name="chevron-down" size={22} color="rgba(255,255,255,0.3)" style={{ marginTop: -12 }} />
+            </Animated.View>
+
             <View style={styles.footerContainer}>
               <ThemedText style={styles.termsText}>
                 By continuing, you agree to our{" "}
-                <ThemedText style={styles.termsLink}>
-                  Terms of Service
-                </ThemedText>{" "}
+                <ThemedText style={styles.termsLink}>Terms of Service</ThemedText>{" "}
                 and{" "}
-                <ThemedText style={styles.termsLink}>Privacy Policy</ThemedText>
-                .
+                <ThemedText style={styles.termsLink}>Privacy Policy</ThemedText>.
               </ThemedText>
             </View>
           </ScrollView>
@@ -164,12 +190,6 @@ const styles = StyleSheet.create({
     paddingTop: 80,
     paddingBottom: 20,
   },
-  logo: {
-    width: 130,
-    height: 130,
-    marginBottom: 10,
-    alignSelf: "center",
-  },
   brandTitle: {
     fontFamily: "YatraOne",
     color: "#FF6EA8",
@@ -178,10 +198,7 @@ const styles = StyleSheet.create({
     lineHeight: 48,
     letterSpacing: 0.6,
     textShadowColor: "rgba(0, 0, 0, 0.38)",
-    textShadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 2,
   },
   headerContainer: {
@@ -192,7 +209,6 @@ const styles = StyleSheet.create({
     marginTop: 45,
     minHeight: 185,
   },
-
   mainLoginButton: {
     height: 45,
     borderRadius: 18,
@@ -203,16 +219,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 22,
-    backdropFilter: "blur(10px)",
   },
-
   mainLoginText: {
     color: "#fff",
     fontSize: 17,
     fontWeight: "700",
     letterSpacing: 0.3,
   },
-
   backButton: {
     width: 42,
     height: 42,
@@ -224,12 +237,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.1)",
   },
-
   loginOptionsWrapper: {
     position: "absolute",
     width: "100%",
   },
-
   googleIconContainer: {
     width: 34,
     height: 34,
@@ -239,13 +250,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: 12,
   },
-
   googleButtonText: {
     color: "#222",
     fontSize: 15,
     fontWeight: "700",
   },
-
   optionButton: {
     height: 44,
     borderRadius: 18,
@@ -257,21 +266,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     marginBottom: 10,
   },
-
   googleButton: {
     backgroundColor: "#FFFFFF",
     borderColor: "#E5E5E5",
   },
-
   mobileActiveButton: {
     borderColor: "rgba(255, 77, 141, 0.4)",
     backgroundColor: "rgba(255, 77, 141, 0.12)",
   },
-
   mobileIconActive: {
     backgroundColor: "rgba(255, 77, 141, 0.3)",
   },
-
   iconContainer: {
     width: 40,
     height: 40,
@@ -281,7 +286,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: 14,
   },
-
   optionButtonText: {
     color: "#fff",
     fontSize: 15,
@@ -301,8 +305,12 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     paddingHorizontal: 20,
   },
+  scrollIndicator: {
+    alignItems: "center",
+    paddingVertical: 14,
+  },
   footerContainer: {
-    marginTop: 40,
+    marginTop: 8,
   },
   termsText: {
     color: "#8B8B91",

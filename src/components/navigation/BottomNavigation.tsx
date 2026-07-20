@@ -1,8 +1,8 @@
 import { useAuth } from "@/context/AuthContext";
 import { ThemedText } from "@/components/themed-text";
-import { Feather } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import { router, usePathname, useLocalSearchParams } from "expo-router";
-import { StyleSheet, TouchableOpacity, View, Platform, Image, ActivityIndicator, Animated } from "react-native";
+import { StyleSheet, TouchableOpacity, View, Platform, Image, ActivityIndicator, Animated, Modal } from "react-native";
 import { useEffect, useState } from "react";
 import AuthModal from "@/components/ui/AuthModal";
 import { BASE_URL, profileApi } from "@/utils/api";
@@ -121,9 +121,19 @@ export default function BottomNavigation({ activeRouteOverride, containerStyle }
     },
   ] as const;
 
+  const [showPlusActionModal, setShowPlusActionModal] = useState(false);
+
   const handleTabPress = (tab: typeof tabs[number]) => {
     if ('action' in tab && tab.action === "upload") {
-      handleUploadPhoto();
+      if (!isAuthenticated) {
+        setShowAuthModal(true);
+        return;
+      }
+      if (!profileCompleted) {
+        setShowLockedWarning(true);
+        return;
+      }
+      setShowPlusActionModal(true);
       return;
     }
     const route = (tab as any).route;
@@ -164,6 +174,58 @@ export default function BottomNavigation({ activeRouteOverride, containerStyle }
   return (
     <>
       <AuthModal visible={showAuthModal} onClose={() => setShowAuthModal(false)} />
+
+      {/* Plus Button Action Modal */}
+      <Modal visible={showPlusActionModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.modalHeaderRow}>
+              <ThemedText style={[styles.modalTitle, { color: colors.text }]}>Quick Action</ThemedText>
+              <TouchableOpacity onPress={() => setShowPlusActionModal(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close" size={22} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ gap: 10, marginTop: 12 }}>
+              <TouchableOpacity
+                style={[styles.modalOptionBtn, { backgroundColor: colors.card2 || colors.background, borderColor: colors.border }]}
+                onPress={() => {
+                  setShowPlusActionModal(false);
+                  router.push("/success-stories?action=add");
+                }}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.modalOptionIconBox, { backgroundColor: "rgba(255, 77, 141, 0.12)" }]}>
+                  <ThemedText style={{ fontSize: 16 }}>💍</ThemedText>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <ThemedText style={[styles.modalOptionTitle, { color: colors.text }]}>Add Success Story</ThemedText>
+                  <ThemedText style={[styles.modalOptionSub, { color: colors.textSecondary }]}>Share your journey & married story</ThemedText>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalOptionBtn, { backgroundColor: colors.card2 || colors.background, borderColor: colors.border }]}
+                onPress={() => {
+                  setShowPlusActionModal(false);
+                  handleUploadPhoto();
+                }}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.modalOptionIconBox, { backgroundColor: "rgba(30, 106, 210, 0.12)" }]}>
+                  <Ionicons name="image-outline" size={18} color="#1E6AD2" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <ThemedText style={[styles.modalOptionTitle, { color: colors.text }]}>Upload Profile / Gallery Photo</ThemedText>
+                  <ThemedText style={[styles.modalOptionSub, { color: colors.textSecondary }]}>Add photos to your profile gallery</ThemedText>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {showLockedWarning && (
         <View style={[styles.lockWarning, { bottom: warningBottom }]}>
@@ -274,5 +336,52 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 10,
     fontWeight: "600",
+  },
+
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "flex-end",
+  },
+  modalCard: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: Platform.OS === "ios" ? 36 : 24,
+    borderWidth: 1,
+  },
+  modalHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+  },
+  modalOptionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 12,
+  },
+  modalOptionIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalOptionTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  modalOptionSub: {
+    fontSize: 11,
+    marginTop: 2,
   },
 });

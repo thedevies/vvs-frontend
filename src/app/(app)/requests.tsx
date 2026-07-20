@@ -98,17 +98,22 @@ export default function RequestsScreen() {
   };
 
   const [activeFilter, setActiveFilter] = useState<
-    "all" | "interests" | "system"
+    "all" | "requests" | "interests" | "system"
   >("all");
-  const [selectedSection, setSelectedSection] = useState<
-    "requests" | "activity"
-  >("requests");
   const [showDropdown, setShowDropdown] = useState(false);
 
-  const filteredNotifications = notifications.filter((n) => {
-    if (activeFilter === "all") return true;
-    return n.category === activeFilter;
-  });
+  const filteredItems = React.useMemo(() => {
+    const requestItems = requests.map((r: any) => ({ ...r, _type: 'request' as const }));
+    const notifItems = notifications.map((n: any) => ({ ...n, _type: 'notification' as const }));
+
+    const all = [...requestItems, ...notifItems];
+
+    if (activeFilter === 'all') return all;
+    if (activeFilter === 'requests') return requestItems;
+    if (activeFilter === 'interests') return notifItems.filter(n => n.category === 'interests');
+    if (activeFilter === 'system') return notifItems.filter(n => n.category === 'system');
+    return all;
+  }, [requests, notifications, activeFilter]);
 
   const getPhotoUrl = (path?: string | null): string => {
     if (!path) return FALLBACK_PHOTO;
@@ -238,7 +243,7 @@ export default function RequestsScreen() {
       return () => {
         subscription.remove();
       };
-    }, [selectedSection]),
+    }, []),
   );
 
   const handleNotificationPress = async (notification: any) => {
@@ -357,245 +362,196 @@ export default function RequestsScreen() {
   return (
     <View style={styles.mainContainer}>
       <SafeAreaView style={styles.container} edges={["top"]}>
+        {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.dropdownBtn}
-            onPress={() => setShowDropdown(true)}
-            activeOpacity={0.75}
-          >
-            <View>
-              <ThemedText style={styles.headerTitle}>
-                {selectedSection === "requests" ? "Requests" : "Activity"}
+          <View>
+            <ThemedText style={styles.headerTitle}>Notifications</ThemedText>
+            <ThemedText style={styles.headerSubtitle}>
+              {requests.length > 0 ? `${requests.length} pending request${requests.length > 1 ? 's' : ''}` : 'All caught up'}
+            </ThemedText>
+          </View>
+        </View>
+
+        {/* Filter Chips Bar */}
+        <View style={styles.filterBar}>
+          {(["all", "requests", "interests", "system"] as const).map((f) => (
+            <TouchableOpacity
+              key={f}
+              style={[
+                styles.filterChip,
+                activeFilter === f && styles.filterChipActive,
+              ]}
+              onPress={() => setActiveFilter(f)}
+              activeOpacity={0.8}
+            >
+              <ThemedText
+                style={[
+                  styles.filterChipText,
+                  activeFilter === f && styles.filterChipTextActive,
+                ]}
+              >
+                {f === "all" ? "All" : f === "requests" ? "Requests" : f === "interests" ? "Interests" : "System"}
               </ThemedText>
-              <ThemedText style={styles.headerSubtitle}>
-                {selectedSection === "requests"
-                  ? requests.length > 0
-                    ? `${requests.length} pending`
-                    : "Connection requests"
-                  : "Recent notifications"}
-              </ThemedText>
-            </View>
-            <View style={styles.dropdownChevronWrap}>
-              <Feather name="chevron-down" size={16} color={colors.text} />
-            </View>
-          </TouchableOpacity>
+              {f === 'requests' && requests.length > 0 && (
+                <View
+                  style={[
+                    styles.filterBadge,
+                    activeFilter === f ? styles.filterBadgeActive : styles.filterBadgeInactive,
+                  ]}
+                >
+                  <ThemedText
+                    style={[
+                      styles.filterBadgeText,
+                      activeFilter === f ? styles.filterBadgeTextActive : styles.filterBadgeTextInactive,
+                    ]}
+                  >
+                    {requests.length}
+                  </ThemedText>
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
         </View>
 
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContainer}
         >
-          {selectedSection === "requests" ? (
-            loading ? (
-              <View style={styles.loaderWrap}>
-                <ActivityIndicator size="large" color={ACCENT} />
+          {loading ? (
+            <View style={styles.loaderWrap}>
+              <ActivityIndicator size="large" color={ACCENT} />
+            </View>
+          ) : filteredItems.length === 0 ? (
+            <View style={styles.emptyState}>
+              <View style={styles.emptyIconCircle}>
+                <Feather name="bell-off" size={22} color={colors.muted} />
               </View>
-            ) : (
-              <View style={styles.sectionContainer}>
-                {requests.length > 0 ? (
-                  <View style={styles.requestsList}>
-                    {requests.map((request) => (
-                      <TouchableOpacity
-                        key={request.id}
-                        style={[styles.requestCard, CARD_SHADOW]}
-                        activeOpacity={0.8}
-                        onPress={() => handleRequestPress(request)}
-                      >
-                        <Image
-                          source={{ uri: request.image }}
-                          style={styles.requestAvatar}
-                        />
-                        <View style={styles.requestContent}>
-                          <ThemedText
-                            style={styles.requestName}
-                            numberOfLines={1}
-                          >
-                            {request.name}
-                          </ThemedText>
-                          <ThemedText
-                            style={styles.requestRole}
-                            numberOfLines={1}
-                          >
-                            {request.role}
-                          </ThemedText>
-                          <View style={styles.requestMetaRow}>
-                            <View style={styles.requestMetaChip}>
-                              <Feather
-                                name="map-pin"
-                                size={10}
-                                color={colors.muted}
-                              />
-                              <ThemedText
-                                style={styles.requestMetaText}
-                                numberOfLines={1}
-                              >
-                                {request.city}
-                              </ThemedText>
-                            </View>
-                            <View style={styles.requestMetaDot} />
-                            <ThemedText style={styles.requestMetaText}>
-                              {request.time}
-                            </ThemedText>
-                          </View>
-
-                          <View style={styles.requestActionRow}>
-                            <TouchableOpacity
-                              style={styles.miniAcceptBtn}
-                              onPress={(e) => {
-                                e.stopPropagation();
-                                handleAcceptRequest(request.name, request.id);
-                              }}
-                              activeOpacity={0.85}
-                            >
-                              <Feather name="check" size={13} color="#fff" />
-                              <ThemedText style={styles.miniBtnText}>
-                                Accept
-                              </ThemedText>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={styles.miniDeclineBtn}
-                              onPress={(e) => {
-                                e.stopPropagation();
-                                handleDeclineRequest(request.id);
-                              }}
-                              activeOpacity={0.85}
-                            >
-                              <ThemedText style={styles.miniBtnTextDecline}>
-                                Decline
-                              </ThemedText>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                ) : (
-                  <View style={styles.emptyState}>
-                    <View style={styles.emptyIconCircle}>
-                      <Feather name="users" size={22} color={colors.muted} />
-                    </View>
-                    <ThemedText style={styles.emptyTitle}>
-                      No pending requests
-                    </ThemedText>
-                    <ThemedText style={styles.emptyBody}>
-                      New connection requests will show up here.
-                    </ThemedText>
-                  </View>
-                )}
-              </View>
-            )
+              <ThemedText style={styles.emptyTitle}>Nothing here yet</ThemedText>
+              <ThemedText style={styles.emptyBody}>
+                {activeFilter === 'requests' ? 'No pending connection requests.' : 'No notifications in this category.'}
+              </ThemedText>
+            </View>
           ) : (
-            /* Recent Activity / Notifications Section */
             <View style={styles.sectionContainer}>
-              {/* Filter Chips */}
-              <View style={styles.filterContainer}>
-                {(["all", "interests", "system"] as const).map((filter) => (
-                  <TouchableOpacity
-                    key={filter}
-                    style={[
-                      styles.filterChip,
-                      activeFilter === filter && styles.filterChipActive,
-                    ]}
-                    onPress={() => setActiveFilter(filter)}
-                    activeOpacity={0.8}
-                  >
-                    <ThemedText
-                      style={[
-                        styles.filterChipText,
-                        activeFilter === filter && styles.filterChipTextActive,
-                      ]}
-                    >
-                      {filter === "all"
-                        ? "All"
-                        : filter === "interests"
-                          ? "Interests"
-                          : "System"}
-                    </ThemedText>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {filteredNotifications.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <View style={styles.emptyIconCircle}>
-                    <Feather name="bell-off" size={22} color={colors.muted} />
+              {/* Requests Section */}
+              {filteredItems.some((i) => i._type === 'request') && (
+                <View style={styles.notificationSection}>
+                  <View style={styles.sectionHeaderRow}>
+                    <ThemedText style={styles.sectionTitle}>Connection Requests</ThemedText>
+                    <View style={styles.countBadge}>
+                      <ThemedText style={styles.countBadgeText}>
+                        {filteredItems.filter((i) => i._type === 'request').length}
+                      </ThemedText>
+                    </View>
                   </View>
-                  <ThemedText style={styles.emptyTitle}>
-                    Nothing here yet
-                  </ThemedText>
-                  <ThemedText style={styles.emptyBody}>
-                    No notifications in this category.
-                  </ThemedText>
+                  <View style={styles.notificationsList}>
+                    {filteredItems
+                      .filter((i) => i._type === 'request')
+                      .map((request: any) => (
+                        <TouchableOpacity
+                          key={`req-${request.id}`}
+                          style={[styles.requestCard, CARD_SHADOW]}
+                          activeOpacity={0.8}
+                          onPress={() => handleRequestPress(request)}
+                        >
+                          <Image
+                            source={{ uri: request.image }}
+                            style={styles.requestAvatar}
+                          />
+                          <View style={styles.requestContent}>
+                            <ThemedText style={styles.requestName} numberOfLines={1}>
+                              {request.name}
+                            </ThemedText>
+                            <ThemedText style={styles.requestRole} numberOfLines={1}>
+                              {request.role}
+                            </ThemedText>
+                            <View style={styles.requestMetaRow}>
+                              <View style={styles.requestMetaChip}>
+                                <Feather name="map-pin" size={10} color={colors.muted} />
+                                <ThemedText style={styles.requestMetaText} numberOfLines={1}>
+                                  {request.city}
+                                </ThemedText>
+                              </View>
+                              <View style={styles.requestMetaDot} />
+                              <ThemedText style={styles.requestMetaText}>{request.time}</ThemedText>
+                            </View>
+
+                            <View style={styles.requestActionRow}>
+                              <TouchableOpacity
+                                style={styles.miniAcceptBtn}
+                                onPress={(e) => {
+                                  e.stopPropagation();
+                                  handleAcceptRequest(request.name, request.id);
+                                }}
+                                activeOpacity={0.85}
+                              >
+                                <Feather name="check" size={13} color="#fff" />
+                                <ThemedText style={styles.miniBtnText}>Accept</ThemedText>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={styles.miniDeclineBtn}
+                                onPress={(e) => {
+                                  e.stopPropagation();
+                                  handleDeclineRequest(request.id);
+                                }}
+                                activeOpacity={0.85}
+                              >
+                                <ThemedText style={styles.miniBtnTextDecline}>Decline</ThemedText>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                  </View>
                 </View>
-              ) : (
-                <ScrollView contentContainerStyle={styles.notificationsScroll}>
-                  {/* Unread Section */}
-                  {filteredNotifications.some((n) => !n.isRead) && (
-                    <View style={styles.notificationSection}>
+              )}
+
+              {/* Notifications Section */}
+              {filteredItems.some((i) => i._type === 'notification') && (
+                <View style={[styles.notificationSection, { marginTop: filteredItems.some((i) => i._type === 'request') ? 20 : 0 }]}>
+                  {/* Unread Notifications */}
+                  {filteredItems.filter((i) => i._type === 'notification' && !i.isRead).length > 0 && (
+                    <View>
                       <View style={styles.sectionHeaderRow}>
-                        <ThemedText style={styles.sectionTitle}>
-                          Unread
-                        </ThemedText>
+                        <ThemedText style={styles.sectionTitle}>Unread</ThemedText>
                         <View style={styles.countBadge}>
                           <ThemedText style={styles.countBadgeText}>
-                            {
-                              filteredNotifications.filter((n) => !n.isRead)
-                                .length
-                            }
+                            {filteredItems.filter((i) => i._type === 'notification' && !i.isRead).length}
                           </ThemedText>
                         </View>
                       </View>
                       <View style={styles.notificationsList}>
-                        {filteredNotifications
-                          .filter((n) => !n.isRead)
-                          .map((notification) => (
+                        {filteredItems
+                          .filter((i) => i._type === 'notification' && !i.isRead)
+                          .map((notification: any) => (
                             <TouchableOpacity
                               key={notification.id}
                               activeOpacity={0.8}
-                              style={[
-                                styles.notificationCard,
-                                styles.unreadNotificationCard,
-                              ]}
-                              onPress={() =>
-                                handleNotificationPress(notification)
-                              }
+                              style={[styles.notificationCard, styles.unreadNotificationCard]}
+                              onPress={() => handleNotificationPress(notification)}
                             >
                               <View style={styles.unreadIconRing}>
                                 <View style={styles.unreadNotificationIcon}>
-                                  <Feather
-                                    name={notification.icon as any}
-                                    size={16}
-                                    color={ACCENT}
-                                  />
+                                  <Feather name={notification.icon as any} size={16} color={ACCENT} />
                                 </View>
                               </View>
                               <View style={styles.notificationInfo}>
                                 <View style={styles.notificationTitleRow}>
                                   <ThemedText
-                                    style={[
-                                      styles.notificationTitle,
-                                      styles.unreadNotificationTitle,
-                                    ]}
+                                    style={[styles.notificationTitle, styles.unreadNotificationTitle]}
                                     numberOfLines={1}
                                   >
                                     {notification.title}
                                   </ThemedText>
                                   <View style={styles.newBadge}>
-                                    <ThemedText style={styles.newBadgeText}>
-                                      NEW
-                                    </ThemedText>
+                                    <ThemedText style={styles.newBadgeText}>NEW</ThemedText>
                                   </View>
                                 </View>
-                                <ThemedText
-                                  style={styles.notificationDescription}
-                                  numberOfLines={2}
-                                >
+                                <ThemedText style={styles.notificationDescription} numberOfLines={2}>
                                   {notification.description}
                                 </ThemedText>
                                 <View style={styles.notificationFooterRow}>
-                                  <ThemedText style={styles.notificationTime}>
-                                    {notification.time}
-                                  </ThemedText>
+                                  <ThemedText style={styles.notificationTime}>{notification.time}</ThemedText>
                                 </View>
                               </View>
                               <TouchableOpacity
@@ -606,11 +562,7 @@ export default function RequestsScreen() {
                                 }}
                                 hitSlop={6}
                               >
-                                <Feather
-                                  name="x"
-                                  size={14}
-                                  color={colors.muted}
-                                />
+                                <Feather name="x" size={14} color={colors.muted} />
                               </TouchableOpacity>
                             </TouchableOpacity>
                           ))}
@@ -618,82 +570,40 @@ export default function RequestsScreen() {
                     </View>
                   )}
 
-                  {/* Read Section */}
-                  {filteredNotifications.some((n) => n.isRead) && (
-                    <View
-                      style={[
-                        styles.notificationSection,
-                        {
-                          marginTop: filteredNotifications.some(
-                            (n) => !n.isRead,
-                          )
-                            ? 20
-                            : 0,
-                        },
-                      ]}
-                    >
-                      <ThemedText
-                        style={[styles.sectionTitle, { color: colors.muted }]}
-                      >
-                        Earlier
-                      </ThemedText>
+                  {/* Read Notifications */}
+                  {filteredItems.filter((i) => i._type === 'notification' && i.isRead).length > 0 && (
+                    <View style={{ marginTop: filteredItems.some((i) => i._type === 'notification' && !i.isRead) ? 16 : 0 }}>
+                      <ThemedText style={[styles.sectionTitle, { color: colors.muted }]}>Earlier</ThemedText>
                       <View style={styles.notificationsList}>
-                        {filteredNotifications
-                          .filter((n) => n.isRead)
-                          .map((notification) => (
+                        {filteredItems
+                          .filter((i) => i._type === 'notification' && i.isRead)
+                          .map((notification: any) => (
                             <TouchableOpacity
                               key={notification.id}
                               activeOpacity={0.8}
-                              style={[
-                                styles.notificationCard,
-                                styles.readNotificationCard,
-                              ]}
-                              onPress={() =>
-                                handleNotificationPress(notification)
-                              }
+                              style={[styles.notificationCard, styles.readNotificationCard]}
+                              onPress={() => handleNotificationPress(notification)}
                             >
-                              <View
-                                style={[
-                                  styles.notificationIcon,
-                                  styles.readNotificationIcon,
-                                ]}
-                              >
-                                <Feather
-                                  name={notification.icon as any}
-                                  size={15}
-                                  color={colors.muted}
-                                />
+                              <View style={[styles.notificationIcon, styles.readNotificationIcon]}>
+                                <Feather name={notification.icon as any} size={15} color={colors.muted} />
                               </View>
                               <View style={styles.notificationInfo}>
                                 <ThemedText
-                                  style={[
-                                    styles.notificationTitle,
-                                    styles.readNotificationTitle,
-                                  ]}
+                                  style={[styles.notificationTitle, styles.readNotificationTitle]}
                                   numberOfLines={1}
                                 >
                                   {notification.title}
                                 </ThemedText>
                                 <ThemedText
-                                  style={[
-                                    styles.notificationDescription,
-                                    styles.readNotificationDescription,
-                                  ]}
+                                  style={[styles.notificationDescription, styles.readNotificationDescription]}
                                   numberOfLines={2}
                                 >
                                   {notification.description}
                                 </ThemedText>
                                 <View style={styles.notificationFooterRow}>
-                                  <ThemedText style={styles.notificationTime}>
-                                    {notification.time}
-                                  </ThemedText>
+                                  <ThemedText style={styles.notificationTime}>{notification.time}</ThemedText>
                                   <View style={styles.seenBadge}>
-                                    <Feather
-                                      name="check"
-                                      size={10}
-                                      color={colors.muted}
-                                      style={{ opacity: 0.7 }}
-                                    />
+                                    <Feather name="check" size={10} color={colors.muted} style={{ opacity: 0.7 }} />
                                   </View>
                                 </View>
                               </View>
@@ -705,132 +615,20 @@ export default function RequestsScreen() {
                                 }}
                                 hitSlop={6}
                               >
-                                <Feather
-                                  name="x"
-                                  size={14}
-                                  color={colors.muted}
-                                />
+                                <Feather name="x" size={14} color={colors.muted} />
                               </TouchableOpacity>
                             </TouchableOpacity>
                           ))}
                       </View>
                     </View>
                   )}
-                </ScrollView>
+                </View>
               )}
             </View>
           )}
         </ScrollView>
       </SafeAreaView>
       <BottomNavigation />
-
-      {/* Dropdown Menu Modal */}
-      <Modal visible={showDropdown} transparent animationType="fade">
-        <TouchableOpacity
-          style={styles.dropdownOverlay}
-          activeOpacity={1}
-          onPress={() => setShowDropdown(false)}
-        >
-          <View
-            style={[
-              styles.dropdownMenu,
-              { backgroundColor: colors.card, borderColor: colors.border },
-            ]}
-          >
-            <TouchableOpacity
-              style={[
-                styles.dropdownItem,
-                selectedSection === "requests" && styles.dropdownItemActive,
-              ]}
-              onPress={() => {
-                setSelectedSection("requests");
-                setShowDropdown(false);
-              }}
-              activeOpacity={0.75}
-            >
-              <View
-                style={[
-                  styles.dropdownItemIconWrap,
-                  selectedSection === "requests" &&
-                    styles.dropdownItemIconWrapActive,
-                ]}
-              >
-                <Feather
-                  name="users"
-                  size={16}
-                  color={selectedSection === "requests" ? ACCENT : colors.muted}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <ThemedText
-                  style={[
-                    styles.dropdownItemText,
-                    selectedSection === "requests" &&
-                      styles.dropdownItemTextActive,
-                  ]}
-                >
-                  Connection Requests
-                </ThemedText>
-                {requests.length > 0 && (
-                  <ThemedText style={styles.dropdownItemSub}>
-                    {requests.length} pending
-                  </ThemedText>
-                )}
-              </View>
-              {selectedSection === "requests" && (
-                <Feather name="check" size={16} color={ACCENT} />
-              )}
-            </TouchableOpacity>
-
-            <View
-              style={[
-                styles.dropdownDivider,
-                { backgroundColor: colors.border },
-              ]}
-            />
-
-            <TouchableOpacity
-              style={[
-                styles.dropdownItem,
-                selectedSection === "activity" && styles.dropdownItemActive,
-              ]}
-              onPress={() => {
-                setSelectedSection("activity");
-                setShowDropdown(false);
-              }}
-              activeOpacity={0.75}
-            >
-              <View
-                style={[
-                  styles.dropdownItemIconWrap,
-                  selectedSection === "activity" &&
-                    styles.dropdownItemIconWrapActive,
-                ]}
-              >
-                <Feather
-                  name="bell"
-                  size={16}
-                  color={selectedSection === "activity" ? ACCENT : colors.muted}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <ThemedText
-                  style={[
-                    styles.dropdownItemText,
-                    selectedSection === "activity" &&
-                      styles.dropdownItemTextActive,
-                  ]}
-                >
-                  Recent Activity
-                </ThemedText>
-              </View>
-              {selectedSection === "activity" && (
-                <Feather name="check" size={16} color={ACCENT} />
-              )}
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
     </View>
   );
 }
@@ -1240,18 +1038,51 @@ const getStyles = (colors: any) =>
     },
 
     // Filters
+    filterBar: {
+      flexDirection: "row",
+      paddingHorizontal: 20,
+      paddingBottom: 12,
+      gap: 8,
+    },
     filterContainer: {
       flexDirection: "row",
       gap: 8,
       marginBottom: 4,
     },
     filterChip: {
-      paddingHorizontal: 16,
-      paddingVertical: 8,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: 14,
+      paddingVertical: 7,
       borderRadius: 999,
       backgroundColor: colors.card,
       borderWidth: 1,
       borderColor: colors.border,
+    },
+    filterBadge: {
+      paddingHorizontal: 6,
+      paddingVertical: 1,
+      borderRadius: 10,
+      justifyContent: "center",
+      alignItems: "center",
+      minWidth: 18,
+    },
+    filterBadgeActive: {
+      backgroundColor: "rgba(255, 255, 255, 0.28)",
+    },
+    filterBadgeInactive: {
+      backgroundColor: ACCENT,
+    },
+    filterBadgeText: {
+      fontSize: 10,
+      fontWeight: "800",
+    },
+    filterBadgeTextActive: {
+      color: "#FFFFFF",
+    },
+    filterBadgeTextInactive: {
+      color: "#FFFFFF",
     },
     filterChipActive: {
       backgroundColor: ACCENT,

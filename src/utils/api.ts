@@ -394,5 +394,99 @@ export const notificationApi = {
     }),
 };
 
+// ─── Personal Information API ──────────────────────────────────────────────────
+
+export interface PersonalInformationData {
+  email?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  fatherName?: string;
+  fatherMobileNumber?: string;
+  fatherOccupation?: string;
+  motherName?: string;
+  motherOccupation?: string;
+  numberOfBrothers?: number;
+  marriedBrothers?: number;
+  numberOfSisters?: number;
+  marriedSisters?: number;
+}
+
+export const personalInformationApi = {
+  add: (data: PersonalInformationData) =>
+    request<ApiResponse>('/personalinformation/add', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getDetails: () =>
+    request<ApiResponse>('/personalinformation/details'),
+
+  update: (data: PersonalInformationData) =>
+    request<ApiResponse>('/personalinformation/update', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+};
+
 // Export base URL for debugging
 export { BASE_URL };
+
+// ─── Success Story API ─────────────────────────────────────────────────────────
+
+export interface SuccessStoryData {
+  partnerName?: string;
+  marriageDate?: string;
+  title: string;
+  story: string;
+  rating?: number;
+  wouldRecommend?: boolean;
+}
+
+export const successStoryApi = {
+  addStory: (data: SuccessStoryData) =>
+    request<ApiResponse>('/success-story/addStory', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  uploadPhotos: async (uris: string[]): Promise<ApiResponse> => {
+    const token = await storage.getAccessToken();
+    const formData = new FormData();
+    uris.forEach((uri, idx) => {
+      const filename = uri.split('/').pop() || `photo_${idx}.jpg`;
+      const ext = filename.split('.').pop()?.toLowerCase() || 'jpg';
+      const mimeType = ext === 'png' ? 'image/png' : 'image/jpeg';
+      formData.append('photos', { uri, name: filename, type: mimeType } as any);
+    });
+    const res = await fetch(`${BASE_URL}/success-story/photos`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    return res.json();
+  },
+
+  myStory: () =>
+    request<ApiResponse>('/success-story/myStory'),
+
+  getAllStories: (page = 1, limit = 20) =>
+    request<ApiResponse>(`/success-story/getAllStories?page=${page}&limit=${limit}`),
+
+  updateStory: (data: Partial<SuccessStoryData>) =>
+    request<ApiResponse>('/success-story/updateStory', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deletePhoto: (photoId: number) =>
+    request<ApiResponse>(`/success-story/photo/${photoId}`, {
+      method: 'DELETE',
+    }),
+
+  deleteStory: () =>
+    request<ApiResponse>('/success-story/deleteStory', {
+      method: 'DELETE',
+    }),
+};
+

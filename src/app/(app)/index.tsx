@@ -21,7 +21,7 @@ import BottomNavigation from "@/components/navigation/BottomNavigation";
 import { ThemedText } from "@/components/themed-text";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
-import { profileApi, notificationApi, BASE_URL } from "@/utils/api";
+import { profileApi, notificationApi, successStoryApi, BASE_URL } from "@/utils/api";
 import AuthModal from "@/components/ui/AuthModal";
 import { useAppTheme } from "@/context/ThemeContext";
 
@@ -114,105 +114,25 @@ const events = [
   },
 ];
 
-export const testimonials = [
-  {
-    coupleMr: "राहुल & प्रिया",
-    coupleEn: "Rahul & Priya",
-    cityMr: "पुणे",
-    quoteMr:
-      "VVS मुळे आम्हाला योग्य जोडीदार मिळाला. हे व्यासपीठ आमच्यासाठी वरदान ठरले!",
-    quoteEn:
-      "VVS helped us find the perfect match. This platform was a blessing for us!",
-    married: "Married • March 2024",
-    avatar:
-      "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?q=80&w=400&auto=format&fit=crop",
-  },
-  {
-    coupleMr: "अमित & सोनाली",
-    coupleEn: "Amit & Sonali",
-    cityMr: "नाशिक",
-    quoteMr: "समाजाच्या बंधनात राहून योग्य निर्णय घेता आला. VVS ला धन्यवाद!",
-    quoteEn:
-      "We could make the right decision within our community. Thank you VVS!",
-    married: "Married • July 2024",
-    avatar:
-      "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?q=80&w=400&auto=format&fit=crop",
-  },
-  {
-    coupleMr: "सचिन & अंजली",
-    coupleEn: "Sachin & Anjali",
-    cityMr: "मुंबई",
-    quoteMr:
-      "VVS ने आमच्या दोघांचे विचार आणि कुटुंब जुळवून आणले. आम्ही अत्यंत आनंदी आहोत!",
-    quoteEn:
-      "VVS aligned our thoughts and families beautifully. We are extremely happy!",
-    married: "Married • October 2024",
-    avatar:
-      "https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=400&auto=format&fit=crop",
-  },
-  {
-    coupleMr: "विक्रम & स्नेहा",
-    coupleEn: "Vikram & Sneha",
-    cityMr: "कोल्हापूर",
-    quoteMr:
-      "विश्वासार्ह आणि सोपी पद्धत. आम्हा दोघांच्या आवडी-निवडी अगदी तंतोतंत जुळल्या.",
-    quoteEn: "Trustworthy and simple approach. Our hobbies matched perfectly.",
-    married: "Married • December 2024",
-    avatar:
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400&auto=format&fit=crop",
-  },
-  {
-    coupleMr: "महेश & पूजा",
-    coupleEn: "Mahesh & Pooja",
-    cityMr: "नागपूर",
-    quoteMr:
-      "फक्त काही दिवसांतच मला माझी सहचारिणी मिळाली. उत्कृष्ट सेवा आणि अनुभव!",
-    quoteEn:
-      "Found my life partner within just a few days. Excellent service and support!",
-    married: "Married • January 2025",
-    avatar:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400&auto=format&fit=crop",
-  },
-  {
-    coupleMr: "रोहन & ज्योती",
-    coupleEn: "Rohan & Jyoti",
-    cityMr: "ठाणे",
-    quoteMr:
-      "आमच्या लग्नाचा प्रवास VVS मुळे सोपा आणि सुंदर झाला. आम्ही कायम ऋणी राहू.",
-    quoteEn:
-      "Our wedding journey was made easy and beautiful by VVS. Forever grateful.",
-    married: "Married • April 2025",
-    avatar:
-      "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=400&auto=format&fit=crop",
-  },
-  {
-    coupleMr: "अनीश & प्राची",
-    coupleEn: "Anish & Prachi",
-    cityMr: "संभाजीनगर",
-    quoteMr:
-      "पारंपारिक मूल्यांची जपणूक करत आधुनिक पद्धतीने जोडीदार शोधण्याचे उत्तम व्यासपीठ.",
-    quoteEn:
-      "A perfect platform to find a life partner preserving traditional values.",
-    married: "Married • June 2025",
-    avatar:
-      "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=400&auto=format&fit=crop",
-  },
-];
-
 // ─── Sub-components (receive isMr so they re-render on language change) ────────
 
 function SectionHeading({
   mr,
   en,
   isMr,
+  rightAction,
 }: {
   mr: string;
   en: string;
   isMr: boolean;
+  rightAction?: React.ReactNode;
 }) {
   return (
     <View style={styles.sectionHeading}>
-      <ThemedText style={styles.sectionTitle}>{isMr ? mr : en}</ThemedText>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <ThemedText style={styles.sectionTitle}>{isMr ? mr : en}</ThemedText>
+        {rightAction}
+      </View>
       <View style={styles.sectionLine} />
     </View>
   );
@@ -383,7 +303,13 @@ function EventsSection({ isMr }: { isMr: boolean }) {
   );
 }
 
-function TestimonialsSection({ isMr }: { isMr: boolean }) {
+function TestimonialsSection({
+  isMr,
+  stories,
+}: {
+  isMr: boolean;
+  stories: any[];
+}) {
   const { colors } = useAppTheme();
   const isNavigating = useRef(false);
   const navigateSafe = (route: any) => {
@@ -395,50 +321,145 @@ function TestimonialsSection({ isMr }: { isMr: boolean }) {
     router.push(route);
   };
 
+  const getStoryPhoto = (item: any): string => {
+    if (item.photos && item.photos.length > 0 && item.photos[0].photoUrl) {
+      const url = item.photos[0].photoUrl;
+      return url.startsWith("http") ? url : `${BASE_URL.replace("/api", "")}${url.startsWith("/") ? url : `/${url}`}`;
+    }
+    if (item.user?.profile?.profilePhoto) {
+      const url = item.user.profile.profilePhoto;
+      return url.startsWith("http") ? url : `${BASE_URL.replace("/api", "")}${url.startsWith("/") ? url : `/${url}`}`;
+    }
+    return "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?q=80&w=400&auto=format&fit=crop";
+  };
+
+  if (!stories || stories.length === 0) {
+    return (
+      <View
+        style={[
+          styles.card,
+          {
+            backgroundColor: colors.card,
+            borderColor: colors.border,
+            padding: 20,
+            alignItems: "center",
+            gap: 8,
+          },
+        ]}
+      >
+        <ThemedText style={{ fontSize: 24 }}>💍</ThemedText>
+        <ThemedText style={{ fontSize: 15, fontWeight: "700", color: colors.text }}>
+          {isMr ? "पहिली यशोगाथा बना!" : "Be the First Success Story!"}
+        </ThemedText>
+        <ThemedText
+          style={{
+            fontSize: 12,
+            color: colors.muted,
+            textAlign: "center",
+            lineHeight: 18,
+          }}
+        >
+          {isMr
+            ? "तुमचा विवाह VVS मुळे जुळला आहे का? तुमची सुंदर कथा सर्वांसोबत शेअर करा."
+            : "Found your soulmate on VVS? Share your beautiful wedding story with our community."}
+        </ThemedText>
+        <TouchableOpacity
+          style={[styles.pinkBtn, { marginTop: 6 }]}
+          onPress={() => navigateSafe("/success-stories?action=add")}
+        >
+          <ThemedText style={styles.pinkBtnText}>
+            {isMr ? "कथा जोडा +" : "Share Your Story +"}
+          </ThemedText>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={{ paddingRight: 20, gap: 16 }}
     >
-      {testimonials.slice(0, 6).map((t, i) => (
-        <View
-          key={i}
-          style={[
-            styles.testimonialHorizontalCard,
-            { backgroundColor: colors.card, borderColor: colors.border },
-          ]}
-        >
-          <View style={styles.testimonialTop}>
-            <View>
-              <ImageBackground
-                source={{ uri: t.avatar }}
-                style={styles.testimonialAvatar}
-                imageStyle={{ borderRadius: 30 }}
-              />
-              <View style={styles.heartBadge}>
-                <ThemedText style={{ fontSize: 11 }}>💍</ThemedText>
+      {stories.slice(0, 6).map((t, i) => {
+        const photoUrl = getStoryPhoto(t);
+        const userName = t.user?.profile?.fullName || (isMr ? "सदस्य" : "Member");
+        const partnerName = t.partnerName || (isMr ? "जोडीदार" : "Partner");
+        const coupleTitle = `${userName} & ${partnerName}`;
+        const city = t.user?.profile?.city || "Vasudev";
+        const dateStr = t.marriageDate
+          ? new Date(t.marriageDate).toLocaleDateString("en-US", {
+              month: "short",
+              year: "numeric",
+            })
+          : "Married";
+
+        const storyText =
+          t.story && t.story.trim().toLowerCase() !== "story"
+            ? t.story.trim()
+            : t.title && t.title.trim().toLowerCase() !== "story"
+              ? t.title.trim()
+              : isMr
+                ? "VVS ला आमचे मनःपूर्वक धन्यवाद!"
+                : "Thank you VVS for completing our union!";
+
+        return (
+          <View
+            key={t.id || i}
+            style={[
+              styles.testimonialHorizontalCard,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+          >
+            <View style={styles.testimonialTop}>
+              <View>
+                <ImageBackground
+                  source={{ uri: photoUrl }}
+                  style={styles.testimonialAvatar}
+                  imageStyle={{ borderRadius: 30 }}
+                />
+                <View style={styles.heartBadge}>
+                  <ThemedText style={{ fontSize: 11 }}>💍</ThemedText>
+                </View>
+              </View>
+              <View style={styles.testimonialMeta}>
+                <ThemedText style={styles.testimonialCouple} numberOfLines={1}>
+                  {coupleTitle}
+                </ThemedText>
+                <ThemedText style={styles.testimonialCity}>
+                  📍 {city}
+                </ThemedText>
+                <ThemedText style={styles.testimonialMarried}>
+                  Married • {dateStr}
+                </ThemedText>
               </View>
             </View>
-            <View style={styles.testimonialMeta}>
-              <ThemedText style={styles.testimonialCouple}>
-                {isMr ? t.coupleMr : t.coupleEn}
-              </ThemedText>
-              <ThemedText style={styles.testimonialCity}>
-                📍 {t.cityMr}
-              </ThemedText>
-              <ThemedText style={styles.testimonialMarried}>
-                {t.married}
+
+            <View style={{ flex: 1, justifyContent: "center", marginTop: 8 }}>
+              {t.title &&
+                t.title.trim().toLowerCase() !== "story" &&
+                t.story &&
+                t.story.trim().toLowerCase() !== "story" &&
+                t.title.trim() !== t.story.trim() && (
+                  <ThemedText
+                    style={{
+                      fontSize: 12.5,
+                      fontWeight: "700",
+                      color: colors.text,
+                      marginBottom: 3,
+                    }}
+                    numberOfLines={1}
+                  >
+                    {t.title.trim()}
+                  </ThemedText>
+                )}
+              <ThemedText style={styles.testimonialQuote} numberOfLines={3}>
+                "{storyText}"
               </ThemedText>
             </View>
           </View>
-          <View style={{ flex: 1, justifyContent: "center", marginTop: 10 }}>
-            <ThemedText style={styles.testimonialQuote} numberOfLines={4}>
-              {isMr ? t.quoteMr : t.quoteEn}
-            </ThemedText>
-          </View>
-        </View>
-      ))}
+        );
+      })}
 
       {/* 7th item: Explore All button card */}
       <TouchableOpacity
@@ -452,7 +473,7 @@ function TestimonialsSection({ isMr }: { isMr: boolean }) {
           <Feather name="arrow-right" size={24} color="#FF4D8D" />
         </View>
         <ThemedText style={styles.exploreTextLabel}>
-          {isMr ? "सर्व यशोगाथा पहा" : "Explore All Stories"}
+          {isMr ? "सर्व कथा पाहा" : "View All Stories"}
         </ThemedText>
       </TouchableOpacity>
     </ScrollView>
@@ -475,10 +496,29 @@ export default function HomeScreen() {
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
   const [eventsOpen, setEventsOpen] = useState(false);
 
-  // Real matches state & Auth Modal state
-  const [realMatches, setRealMatches] = useState<any[]>([]);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [realMatches, setRealMatches] = useState<any[]>([]);
+  const [realStories, setRealStories] = useState<any[]>([]);
+
+  const bounceAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(bounceAnim, {
+          toValue: 4,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(bounceAnim, {
+          toValue: 0,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [bounceAnim]);
 
   const fetchUnreadCount = useCallback(async () => {
     if (!user) return;
@@ -555,7 +595,18 @@ export default function HomeScreen() {
 
   useEffect(() => {
     fetchMatches();
+    fetchStories();
   }, [isAuthenticated, profileCompleted]);
+
+  const fetchStories = async () => {
+    try {
+      const res = await successStoryApi.getAllStories();
+      const list = Array.isArray(res.data) ? res.data : res.data?.stories || [];
+      setRealStories(list);
+    } catch (err: any) {
+      console.log("[Home] Failed to load success stories:", err.message);
+    }
+  };
 
   const fetchMatches = async () => {
     try {
@@ -781,6 +832,21 @@ export default function HomeScreen() {
                   )}
                 </View>
               </View>
+
+              {/* Faded Scroll Down Hint at Bottom of Hero */}
+              <Animated.View
+                style={[
+                  styles.scrollHintContainer,
+                  { transform: [{ translateY: bounceAnim }] },
+                ]}
+              >
+                <View style={styles.scrollHintPill}>
+                  <ThemedText style={styles.scrollHintText}>
+                    {isMr ? "खाली स्क्रोल करा" : "Scroll down"}
+                  </ThemedText>
+                  <Feather name="chevron-down" size={12} color="rgba(255,255,255,0.45)" style={{ marginLeft: 3 }} />
+                </View>
+              </Animated.View>
             </View>
           </ImageBackground>
         </Animated.View>
@@ -930,8 +996,23 @@ export default function HomeScreen() {
 
         {/* ── Success Stories ── */}
         <View style={styles.section}>
-          <SectionHeading mr="यशोगाथा" en="Success Stories" isMr={isMr} />
-          <TestimonialsSection isMr={isMr} />
+          <SectionHeading
+            mr="यशोगाथा"
+            en="Success Stories"
+            isMr={isMr}
+            rightAction={
+              isAuthenticated ? (
+                <TouchableOpacity
+                  style={styles.headerPlusBtn}
+                  onPress={() => navigateSafe("/success-stories?action=add")}
+                  activeOpacity={0.8}
+                >
+                  <Feather name="plus" size={14} color="#FF4D8D" />
+                </TouchableOpacity>
+              ) : null
+            }
+          />
+          <TestimonialsSection isMr={isMr} stories={realStories} />
         </View>
 
         {/* ── CTA Banner ── */}
@@ -1083,6 +1164,41 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 77, 141, 0.15)",
     borderWidth: 1,
     borderColor: "rgba(255, 77, 141, 0.35)",
+  },
+  headerPlusBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "rgba(255, 77, 141, 0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 77, 141, 0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  scrollHintContainer: {
+    position: "absolute",
+    bottom: 40,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    zIndex: 10,
+  },
+  scrollHintPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.22)",
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.12)",
+    opacity: 0.55,
+  },
+  scrollHintText: {
+    fontSize: 10.5,
+    fontWeight: "500",
+    color: "rgba(255, 255, 255, 0.55)",
+    letterSpacing: 0.3,
   },
   badgeContainer: {
     position: 'absolute',
