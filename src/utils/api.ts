@@ -14,22 +14,29 @@ import type {
   UpdateProfileRequest,
 } from './types';
 
-// Auto-detect backend URL from Expo dev server host
+// Auto-detect backend URL from env or Expo dev server host
 function getBaseUrl(): string {
-  // Allow explicit override
+  // Allow explicit override via EXPO_PUBLIC_API_URL
   const envUrl = process.env.EXPO_PUBLIC_API_URL;
-  if (envUrl) return envUrl;
-
-  // In Expo Go, Constants.expoConfig?.hostUri gives us "192.168.x.x:8081"
-  // We extract just the IP and use port 3000 (backend port)
-  const hostUri = Constants.expoConfig?.hostUri;
-  if (hostUri) {
-    const ip = hostUri.split(':')[0];
-    return `http://${ip}:3000/api`;
+  if (envUrl && envUrl.trim().length > 0) {
+    let url = envUrl.trim().replace(/\/+$/, '');
+    if (!url.endsWith('/api')) {
+      url = `${url}/api`;
+    }
+    return url;
   }
 
-  // Fallback for web or production
-  return 'http://localhost:3000/api';
+  // In Expo Go / local development, auto-detect local machine IP
+  if (__DEV__) {
+    const hostUri = Constants.expoConfig?.hostUri;
+    if (hostUri) {
+      const ip = hostUri.split(':')[0];
+      return `http://${ip}:3000/api`;
+    }
+  }
+
+  // Fallback for production standalone builds (Expo APK / Test build)
+  return 'https://vvs-backend-jaei.onrender.com/api';
 }
 
 const BASE_URL = getBaseUrl();
@@ -50,7 +57,7 @@ export function registerSessionExpiredCallback(cb: () => void) {
 async function refreshAccessToken(): Promise<string | null> {
   try {
     const refreshToken = await storage.getRefreshToken();
-    if (!refreshToken) return null;
+    if (!refreshToken) return 'AUTH_FAILED';
 
     const response = await fetch(`${BASE_URL}/auth/refresh-token`, {
       method: 'POST',
@@ -58,25 +65,18 @@ async function refreshAccessToken(): Promise<string | null> {
       body: JSON.stringify({ refreshToken }),
     });
 
-    if (response.status === 401 || response.status === 400) {
-      // The refresh token itself is invalid or expired
-      return 'AUTH_FAILED';
-    }
-
     if (!response.ok) {
-      // Server error or other transient issue
-      return null;
+      return 'AUTH_FAILED';
     }
 
     const data = await response.json();
     if (data.accessToken) {
       await storage.setAccessToken(data.accessToken);
-      setCachedToken(data.accessToken); // Update cache
+      setCachedToken(data.accessToken);
       return data.accessToken;
     }
-    return null;
+    return 'AUTH_FAILED';
   } catch {
-    // Network error
     return null;
   }
 }
@@ -306,12 +306,23 @@ export const profileApi = {
     maritalStatus: 'never_married' | 'divorced' | 'widowed';
     dateOfBirth: string;
     city?: string;
+    state?: string;
+    country?: string;
     profession?: string;
     education?: string;
     religion?: string;
     caste?: string;
+    profilePhoto?: string;
     fatherName?: string;
+    fatherMobileNumber?: string;
+    fatherOccupation?: string;
     motherName?: string;
+    motherOccupation?: string;
+    numberOfBrothers?: number;
+    marriedBrothers?: number;
+    numberOfSisters?: number;
+    marriedSisters?: number;
+    address?: string;
     bio?: string;
   }) =>
     request<ApiResponse<Biodata>>('/profile/biodata/generate', {

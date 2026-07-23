@@ -55,10 +55,12 @@ export default function SettingsScreen() {
       setDeactivatingAccount(true);
       console.log('[Account] Deactivating user account...');
       const response = await profileApi.deletedOrDeactivateProfile('deactive');
-      if (response.message) {
+      if (response && (response.message || response.data)) {
         setShowConfirmDeactivateModal(false);
-        Alert.alert('Deactivated', 'Your account has been deactivated successfully.');
+        Alert.alert('Deactivated', response.message || 'Your account has been deactivated successfully.');
         await logout();
+      } else {
+        Alert.alert('Error', response?.message || 'Failed to deactivate account.');
       }
     } catch (err: any) {
       console.log('[Account] Failed to deactivate account:', err);
@@ -73,10 +75,12 @@ export default function SettingsScreen() {
       setDeletingAccount(true);
       console.log('[Account] Deleting user account...');
       const response = await profileApi.deletedOrDeactivateProfile('delete');
-      if (response.message) {
+      if (response && (response.message || response.data)) {
         setShowConfirmDeleteModal(false);
-        Alert.alert('Deleted', 'Your account has been deleted.');
+        Alert.alert('Deleted', response.message || 'Your account has been deleted.');
         await logout();
+      } else {
+        Alert.alert('Error', response?.message || 'Failed to delete account.');
       }
     } catch (err: any) {
       console.log('[Account] Failed to delete account:', err);

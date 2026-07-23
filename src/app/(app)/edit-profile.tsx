@@ -250,11 +250,22 @@ export default function EditProfileScreen() {
         maritalStatus: maritalStatus || (profile?.maritalStatus as any) || 'never_married',
         dateOfBirth: dateOfBirth || (profile?.dateOfBirth ? profile.dateOfBirth.split('T')[0] : '1998-05-20'),
         city: city.trim() || profile?.city || undefined,
+        state: stateVal.trim() || profile?.state || undefined,
+        country: country.trim() || profile?.country || undefined,
         profession: profession.trim() || profile?.profession || undefined,
         education: education.trim() || profile?.education || undefined,
         bio: bio.trim() || profile?.bio || undefined,
+        profilePhoto: uploadedPhotoUrl || photoUri || profile?.profilePhoto || undefined,
         fatherName: piFatherName.trim() || undefined,
+        fatherMobileNumber: piFatherMobile.trim() || undefined,
+        fatherOccupation: piFatherOccupation.trim() || undefined,
         motherName: piMotherName.trim() || undefined,
+        motherOccupation: piMotherOccupation.trim() || undefined,
+        numberOfBrothers: piNumBrothers ? parseInt(piNumBrothers, 10) : undefined,
+        marriedBrothers: piMarriedBrothers ? parseInt(piMarriedBrothers, 10) : undefined,
+        numberOfSisters: piNumSisters ? parseInt(piNumSisters, 10) : undefined,
+        marriedSisters: piMarriedSisters ? parseInt(piMarriedSisters, 10) : undefined,
+        address: piAddress.trim() || undefined,
       });
 
       if (response.data) {
@@ -558,7 +569,8 @@ export default function EditProfileScreen() {
 
       Alert.alert(
         'Profile Save Error',
-        `An error occurred in the "${errorLocation}".\n\nDetails: ${cleanErrorMessage || 'Please check your inputs and try again.'}`,
+        // `An error occurred in the "${errorLocation}".\n\nDetails: ${cleanErrorMessage || 'Please check your inputs and try again.'}`,
+        `${cleanErrorMessage || 'Please check your inputs and try again.'}`,
         [{ text: 'OK' }],
         'error'
       );

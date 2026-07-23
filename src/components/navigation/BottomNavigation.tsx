@@ -12,6 +12,8 @@ import { CustomAlert as Alert } from "@/utils/alert";
 import { eventEmitter } from "@/utils/events";
 import { useAppTheme } from "@/context/ThemeContext";
 
+import { useLanguage } from "@/context/LanguageContext";
+
 type BottomNavigationProps = {
   activeRouteOverride?: string;
   containerStyle?: any;
@@ -22,6 +24,7 @@ export default function BottomNavigation({ activeRouteOverride, containerStyle }
   const params = useLocalSearchParams();
   const { isAuthenticated, profileCompleted, user } = useAuth();
   const { colors, isDark } = useAppTheme();
+  const { t } = useLanguage();
   const [showLockedWarning, setShowLockedWarning] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const insets = useSafeAreaInsets();
@@ -89,34 +92,27 @@ export default function BottomNavigation({ activeRouteOverride, containerStyle }
   const tabs = [
     {
       icon: "home",
-      label: "Home",
+      label: t("home"),
       route: "/",
     },
     {
       icon: "compass",
-      label: "Explore",
+      label: t("explore"),
       route: "/explore",
     },
-    /*
-    {
-      icon: "search",
-      label: "Search",
-      route: "/search",
-    },
-    */
     {
       icon: "plus",
-      label: "Upload",
+      label: t("upload"),
       action: "upload",
     },
     {
       icon: "heart",
-      label: "Requests",
+      label: t("requests"),
       route: "/requests",
     },
     {
       icon: "user",
-      label: "Profile",
+      label: t("profile"),
       route: "/profile",
     },
   ] as const;
@@ -180,7 +176,7 @@ export default function BottomNavigation({ activeRouteOverride, containerStyle }
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.modalHeaderRow}>
-              <ThemedText style={[styles.modalTitle, { color: colors.text }]}>Quick Action</ThemedText>
+              <ThemedText style={[styles.modalTitle, { color: colors.text }]}>{t('quickAction')}</ThemedText>
               <TouchableOpacity onPress={() => setShowPlusActionModal(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Ionicons name="close" size={22} color={colors.text} />
               </TouchableOpacity>
@@ -199,8 +195,8 @@ export default function BottomNavigation({ activeRouteOverride, containerStyle }
                   <ThemedText style={{ fontSize: 16 }}>💍</ThemedText>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <ThemedText style={[styles.modalOptionTitle, { color: colors.text }]}>Add Success Story</ThemedText>
-                  <ThemedText style={[styles.modalOptionSub, { color: colors.textSecondary }]}>Share your journey & married story</ThemedText>
+                  <ThemedText style={[styles.modalOptionTitle, { color: colors.text }]}>{t('addSuccessStory')}</ThemedText>
+                  <ThemedText style={[styles.modalOptionSub, { color: colors.textSecondary }]}>{t('shareJourney')}</ThemedText>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
               </TouchableOpacity>
@@ -217,8 +213,8 @@ export default function BottomNavigation({ activeRouteOverride, containerStyle }
                   <Ionicons name="image-outline" size={18} color="#1E6AD2" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <ThemedText style={[styles.modalOptionTitle, { color: colors.text }]}>Upload Profile / Gallery Photo</ThemedText>
-                  <ThemedText style={[styles.modalOptionSub, { color: colors.textSecondary }]}>Add photos to your profile gallery</ThemedText>
+                  <ThemedText style={[styles.modalOptionTitle, { color: colors.text }]}>{t('uploadProfilePhoto')}</ThemedText>
+                  <ThemedText style={[styles.modalOptionSub, { color: colors.textSecondary }]}>{t('addPhotosToGallery')}</ThemedText>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
               </TouchableOpacity>

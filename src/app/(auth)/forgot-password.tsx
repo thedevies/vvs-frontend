@@ -1,3 +1,4 @@
+import React from 'react';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -11,8 +12,15 @@ import {
 import CustomButton from '@/components/ui/CustomButton';
 import CustomInput from '@/components/ui/CustomInput';
 import { ThemedText } from '@/components/themed-text';
+import { useAppTheme } from '@/context/ThemeContext';
+import { useLanguage } from '@/context/LanguageContext';
 
 export default function ForgotPasswordScreen() {
+  const { colors, isDark } = useAppTheme();
+  const { t } = useLanguage();
+
+  const styles = getStyles(colors, isDark);
+
   return (
     <ImageBackground
       source={{
@@ -21,27 +29,27 @@ export default function ForgotPasswordScreen() {
       style={styles.background}>
       <View style={styles.overlay}>
         <SafeAreaView style={{ flex: 1 }}>
-          <ScrollView contentContainerStyle={styles.container}>
+          <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
             <View>
-              <ThemedText style={styles.title}>Reset Password</ThemedText>
+              <ThemedText style={styles.title}>{t('resetPassword')}</ThemedText>
 
               <ThemedText style={styles.subtitle}>
-                Enter your email address and we will send you a link to reset your password.
+                {t('resetSub')}
               </ThemedText>
             </View>
 
             <View style={styles.formContainer}>
-              <CustomInput placeholder="Email Address" />
+              <CustomInput placeholder={t('emailAddress')} />
 
               <CustomButton
-                title="Send Reset Link"
-                onPress={() => router.push('/login')}
+                title={t('sendResetLink')}
+                onPress={() => router.push('/(auth)/mobile')}
               />
             </View>
 
-            <TouchableOpacity onPress={() => router.push('/login')}>
+            <TouchableOpacity onPress={() => router.push('/(auth)/mobile')}>
               <ThemedText style={styles.bottomText}>
-                Remember your password? Login
+                {t('rememberPassword')}
               </ThemedText>
             </TouchableOpacity>
           </ScrollView>
@@ -51,35 +59,37 @@ export default function ForgotPasswordScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  background: {
-    flex: 1,
-  },
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.72)',
-  },
-  container: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    gap: 32,
-  },
-  title: {
-    color: '#fff',
-    fontSize: 42,
-    fontWeight: '800',
-  },
-  subtitle: {
-    color: '#B1B1B7',
-    marginTop: 12,
-    lineHeight: 24,
-  },
-  formContainer: {
-    gap: 18,
-  },
-  bottomText: {
-    color: '#FF4D8D',
-    textAlign: 'center',
-  },
-});
+const getStyles = (colors: any, isDark: boolean) =>
+  StyleSheet.create({
+    background: {
+      flex: 1,
+    },
+    overlay: {
+      flex: 1,
+      backgroundColor: isDark ? 'rgba(0,0,0,0.72)' : 'rgba(255,255,255,0.85)',
+    },
+    container: {
+      flexGrow: 1,
+      justifyContent: 'center',
+      paddingHorizontal: 24,
+      gap: 32,
+    },
+    title: {
+      color: isDark ? '#fff' : colors.text,
+      fontSize: 38,
+      fontWeight: '800',
+    },
+    subtitle: {
+      color: colors.textSecondary,
+      marginTop: 12,
+      lineHeight: 24,
+    },
+    formContainer: {
+      gap: 18,
+    },
+    bottomText: {
+      color: '#FF4D8D',
+      textAlign: 'center',
+      fontWeight: '600',
+    },
+  });

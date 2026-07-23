@@ -11,6 +11,8 @@ import { Feather } from '@expo/vector-icons';
 
 import BottomNavigation from '@/components/navigation/BottomNavigation';
 import { ThemedText } from '@/components/themed-text';
+import { useAppTheme } from '@/context/ThemeContext';
+import { useLanguage } from '@/context/LanguageContext';
 
 const CHATS = [
   {
@@ -43,29 +45,34 @@ const CHATS = [
 ];
 
 export default function ChatsScreen() {
+  const { colors, isDark } = useAppTheme();
+  const { t } = useLanguage();
+
+  const styles = getStyles(colors, isDark);
+
   return (
     <View style={styles.mainContainer}>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <ThemedText style={styles.headerTitle}>Messages</ThemedText>
+          <ThemedText style={styles.headerTitle}>{t('chats')}</ThemedText>
           <TouchableOpacity style={styles.iconButton}>
-            <Feather name="search" size={24} color="#fff" />
+            <Feather name="search" size={22} color={colors.text} />
           </TouchableOpacity>
         </View>
 
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContainer}>
-          
+
           <View style={styles.matchesSection}>
-            <ThemedText style={styles.sectionTitle}>New Matches</ThemedText>
+            <ThemedText style={styles.sectionTitle}>{t('newMatches')}</ThemedText>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
               {[1, 2, 3, 4, 5].map((_, index) => (
                 <View key={index} style={styles.newMatchItem}>
                   <View style={styles.imageContainer}>
-                    <Image 
-                      source={{ uri: CHATS[index % CHATS.length].image }} 
-                      style={styles.newMatchImage} 
+                    <Image
+                      source={{ uri: CHATS[index % CHATS.length].image }}
+                      style={styles.newMatchImage}
                     />
                     <View style={styles.onlineBadge} />
                   </View>
@@ -84,7 +91,7 @@ export default function ChatsScreen() {
                   <Image source={{ uri: chat.image }} style={styles.chatImage} />
                   {chat.online && <View style={styles.onlineDot} />}
                 </View>
-                
+
                 <View style={styles.chatContent}>
                   <View style={styles.chatHeader}>
                     <ThemedText style={styles.chatName}>{chat.name}</ThemedText>
@@ -92,14 +99,14 @@ export default function ChatsScreen() {
                       {chat.time}
                     </ThemedText>
                   </View>
-                  
+
                   <View style={styles.chatMessageRow}>
-                    <ThemedText 
-                      style={[styles.chatMessage, chat.unread > 0 && styles.unreadMessage]} 
+                    <ThemedText
+                      style={[styles.chatMessage, chat.unread > 0 && styles.unreadMessage]}
                       numberOfLines={1}>
                       {chat.message}
                     </ThemedText>
-                    
+
                     {chat.unread > 0 && (
                       <View style={styles.unreadBadge}>
                         <ThemedText style={styles.unreadText}>{chat.unread}</ThemedText>
@@ -117,165 +124,166 @@ export default function ChatsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  mainContainer: {
-    flex: 1,
-    backgroundColor: '#0F0F12',
-  },
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    gap: 12,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#fff',
-  },
-  iconButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#17171C',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-  },
-  scrollContainer: {
-    paddingBottom: 140,
-  },
-  matchesSection: {
-    paddingVertical: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#fff',
-    paddingHorizontal: 20,
-    marginBottom: 16,
-  },
-  horizontalScroll: {
-    paddingHorizontal: 20,
-    gap: 16,
-  },
-  newMatchItem: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  imageContainer: {
-    position: 'relative',
-  },
-  newMatchImage: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    borderWidth: 2,
-    borderColor: '#FF4D8D',
-  },
-  onlineBadge: {
-    position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#3BFF87',
-    borderWidth: 3,
-    borderColor: '#0F0F12',
-  },
-  newMatchName: {
-    color: '#D0D0D5',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  chatList: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    gap: 20,
-  },
-  chatItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  chatImageContainer: {
-    position: 'relative',
-  },
-  chatImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-  },
-  onlineDot: {
-    position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#3BFF87',
-    borderWidth: 2,
-    borderColor: '#0F0F12',
-  },
-  chatContent: {
-    flex: 1,
-    justifyContent: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
-    paddingBottom: 16,
-  },
-  chatHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  chatName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  chatTime: {
-    fontSize: 12,
-    color: '#8B8B91',
-  },
-  unreadTime: {
-    color: '#FF4D8D',
-    fontWeight: '600',
-  },
-  chatMessageRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 16,
-  },
-  chatMessage: {
-    flex: 1,
-    fontSize: 14,
-    color: '#8B8B91',
-  },
-  unreadMessage: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  unreadBadge: {
-    backgroundColor: '#FF4D8D',
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  unreadText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-});
+const getStyles = (colors: any, isDark: boolean) =>
+  StyleSheet.create({
+    mainContainer: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    container: {
+      flex: 1,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      gap: 12,
+    },
+    headerTitle: {
+      flex: 1,
+      fontSize: 32,
+      fontWeight: '800',
+      color: colors.text,
+    },
+    iconButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.card,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    scrollContainer: {
+      paddingBottom: 140,
+    },
+    matchesSection: {
+      paddingVertical: 16,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: colors.text,
+      paddingHorizontal: 20,
+      marginBottom: 16,
+    },
+    horizontalScroll: {
+      paddingHorizontal: 20,
+      gap: 16,
+    },
+    newMatchItem: {
+      alignItems: 'center',
+      gap: 8,
+    },
+    imageContainer: {
+      position: 'relative',
+    },
+    newMatchImage: {
+      width: 68,
+      height: 68,
+      borderRadius: 34,
+      borderWidth: 2,
+      borderColor: '#FF4D8D',
+    },
+    onlineBadge: {
+      position: 'absolute',
+      bottom: 2,
+      right: 2,
+      width: 16,
+      height: 16,
+      borderRadius: 8,
+      backgroundColor: '#22C55E',
+      borderWidth: 3,
+      borderColor: colors.background,
+    },
+    newMatchName: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    chatList: {
+      paddingHorizontal: 20,
+      paddingTop: 8,
+      gap: 20,
+    },
+    chatItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
+    },
+    chatImageContainer: {
+      position: 'relative',
+    },
+    chatImage: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+    },
+    onlineDot: {
+      position: 'absolute',
+      bottom: 2,
+      right: 2,
+      width: 14,
+      height: 14,
+      borderRadius: 7,
+      backgroundColor: '#22C55E',
+      borderWidth: 2,
+      borderColor: colors.background,
+    },
+    chatContent: {
+      flex: 1,
+      justifyContent: 'center',
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      paddingBottom: 16,
+    },
+    chatHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 6,
+    },
+    chatName: {
+      fontSize: 17,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    chatTime: {
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
+    unreadTime: {
+      color: '#FF4D8D',
+      fontWeight: '600',
+    },
+    chatMessageRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      gap: 16,
+    },
+    chatMessage: {
+      flex: 1,
+      fontSize: 14,
+      color: colors.textSecondary,
+    },
+    unreadMessage: {
+      color: colors.text,
+      fontWeight: '600',
+    },
+    unreadBadge: {
+      backgroundColor: '#FF4D8D',
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    unreadText: {
+      color: '#fff',
+      fontSize: 12,
+      fontWeight: '700',
+    },
+  });
