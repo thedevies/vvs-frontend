@@ -79,6 +79,7 @@ export interface VerifyOtpRequest {
   otp: string;
   deviceId: string;
   ipAddress: string;
+  confirmNewDevice?: boolean;
 }
 
 export interface CreateProfileRequest {

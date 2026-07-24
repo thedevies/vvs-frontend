@@ -172,11 +172,21 @@ export const authApi = {
       body: JSON.stringify(body),
     }, false),
 
-  verifyOtp: (body: VerifyOtpRequest) =>
-    request<Partial<AuthResponse> & { message: string }>('/auth/verify-otp', {
+  verifyOtp: (body: VerifyOtpRequest) => {
+    const payload: any = {
+      mobile: body.mobile,
+      otp: body.otp,
+      deviceId: body.deviceId,
+      ipAddress: body.ipAddress,
+    };
+    if (body.confirmNewDevice) {
+      payload.confirmNewDevice = true;
+    }
+    return request<Partial<AuthResponse> & { message: string }>('/auth/verify-otp', {
       method: 'POST',
-      body: JSON.stringify(body),
-    }, false),
+      body: JSON.stringify(payload),
+    }, false);
+  },
 
   getMe: () =>
     request<{ message: string; user: User }>('/auth/me'),

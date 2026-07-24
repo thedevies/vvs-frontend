@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
   Animated,
+  BackHandler,
 } from "react-native";
 import { Feather, FontAwesome } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
@@ -24,25 +25,26 @@ export default function WelcomeScreen() {
   const { colors, isDark } = useAppTheme();
   const { t } = useLanguage();
 
-  const styles = getStyles(colors, isDark);
-
-  // Bounce animation for scroll indicator
-  const bounceAnim = useRef(new Animated.Value(0)).current;
-  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(app)');
+    }
+  };
 
   useEffect(() => {
-    const bounce = Animated.loop(
-      Animated.sequence([
-        Animated.timing(bounceAnim, { toValue: 10, duration: 600, useNativeDriver: true }),
-        Animated.timing(bounceAnim, { toValue: 0, duration: 600, useNativeDriver: true }),
-      ])
-    );
-    bounce.start();
-    return () => bounce.stop();
+    const onBackPress = () => {
+      handleBack();
+      return true;
+    };
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
   }, []);
 
+  const styles = getStyles(colors, isDark);
+
   const handleShowLogin = () => {
-    Animated.timing(fadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start();
     setShowLoginOptions(true);
   };
 
@@ -74,6 +76,21 @@ export default function WelcomeScreen() {
     >
       <View style={styles.overlay}>
         <SafeAreaView style={{ flex: 1 }}>
+          <View style={{ paddingHorizontal: 16, paddingTop: 10 }}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleBack}
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                backgroundColor: 'rgba(0,0,0,0.4)',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}>
+              <Feather name="arrow-left" size={22} color="#FFF" />
+            </TouchableOpacity>
+          </View>
           <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
             <View style={styles.headerContainer}>
               <ThemedText style={styles.title}>
@@ -100,16 +117,6 @@ export default function WelcomeScreen() {
               ) : (
                 <View style={styles.loginOptionsWrapper}>
                   {/* Back Button */}
-                  <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => {
-                      Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
-                      setShowLoginOptions(false);
-                    }}
-                  >
-                    <Feather name="arrow-left" size={22} color={isDark ? "#fff" : colors.text} />
-                  </TouchableOpacity>
-
                   {/* Google */}
                   <TouchableOpacity
                     activeOpacity={0.85}
@@ -154,17 +161,6 @@ export default function WelcomeScreen() {
                 </View>
               )}
             </View>
-
-            {/* Scroll-down bounce indicator */}
-            <Animated.View
-              style={[
-                styles.scrollIndicator,
-                { opacity: fadeAnim, transform: [{ translateY: bounceAnim }] },
-              ]}
-            >
-              <Feather name="chevron-down" size={22} color={isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.5)"} />
-              <Feather name="chevron-down" size={22} color={isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.25)"} style={{ marginTop: -12 }} />
-            </Animated.View>
 
             <View style={styles.footerContainer}>
               <ThemedText style={styles.termsText}>
@@ -232,17 +228,6 @@ const getStyles = (colors: any, isDark: boolean) =>
       fontSize: 17,
       fontWeight: "700",
       letterSpacing: 0.3,
-    },
-    backButton: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
-      backgroundColor: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.06)",
-      justifyContent: "center",
-      alignItems: "center",
-      marginBottom: 10,
-      borderWidth: 1,
-      borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)",
     },
     loginOptionsWrapper: {
       position: "absolute",
@@ -316,10 +301,6 @@ const getStyles = (colors: any, isDark: boolean) =>
       textAlign: "center",
       lineHeight: 23,
       paddingHorizontal: 20,
-    },
-    scrollIndicator: {
-      alignItems: "center",
-      paddingVertical: 14,
     },
     footerContainer: {
       marginTop: 8,

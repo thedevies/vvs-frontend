@@ -29,6 +29,7 @@ import type { UserPhoto } from "@/utils/types";
 import { eventEmitter } from "@/utils/events";
 import { useAppTheme } from "@/context/ThemeContext";
 import { pickImageWithPermissionCheck } from "@/utils/imagePicker";
+import InAppPdfModal from "@/components/ui/InAppPdfModal";
 
 const { width: SW } = Dimensions.get("window");
 
@@ -77,6 +78,9 @@ export default function ProfileScreen() {
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
+  const [showPrivacyLockedModal, setShowPrivacyLockedModal] = useState(false);
+  const [pdfUrlToView, setPdfUrlToView] = useState<string | null>(null);
+  const [showPdfModal, setShowPdfModal] = useState(false);
   const [religion, setReligion] = useState("Hindu");
   const [caste, setCaste] = useState("Vasudev");
   const [fatherName, setFatherName] = useState("");
@@ -510,8 +514,9 @@ export default function ProfileScreen() {
     const fullUrl = url.startsWith("http")
       ? url
       : `${BASE_URL.replace("/api", "")}${url.startsWith("/") ? url : `/${url}`}`;
-    console.log("[Biodata] Opening PDF:", fullUrl);
-    await WebBrowser.openBrowserAsync(fullUrl);
+    console.log("[Biodata] Opening PDF inside app:", fullUrl);
+    setPdfUrlToView(fullUrl);
+    setShowPdfModal(true);
   };
 
   const handleUpdateBiodata = () => {
@@ -961,19 +966,21 @@ export default function ProfileScreen() {
               <Image source={{ uri: displayImage }} style={styles.heroAvatar} />
             </View>
 
-            {/* Name + verified */}
-            <View style={styles.heroNameRow}>
+            {/* Name + verified (Name strictly centered, checkmark balanced) */}
+            <View style={{ width: '100%', alignItems: 'center', justifyContent: 'center', flexDirection: 'row' }}>
+              <View style={{ width: 26 }} />
               <ThemedText style={styles.heroName}>{displayName}</ThemedText>
-              {(isOtherProfileView
-                ? otherUser?.isMobileVerified
-                : user?.isMobileVerified) && (
-                <Ionicons
-                  name="checkmark-circle"
-                  size={20}
-                  color="#0095f6"
-                  style={{ marginLeft: 6 }}
-                />
-              )}
+              <View style={{ width: 26, alignItems: 'flex-start', justifyContent: 'center', marginLeft: 4 }}>
+                {(isOtherProfileView
+                  ? otherUser?.isMobileVerified
+                  : user?.isMobileVerified) && (
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={20}
+                    color="#0095f6"
+                  />
+                )}
+              </View>
             </View>
 
             {/* Subtitle — age · city */}
@@ -1428,7 +1435,6 @@ export default function ProfileScreen() {
 
                       const items = [
                         { icon: "calendar-outline" as const, label: "Date of Birth", value: targetDob },
-                        { icon: "mail-outline" as const, label: "Email", value: targetEmail },
                         { icon: "home-outline" as const, label: "Address", value: targetAddress },
                         { icon: "location-outline" as const, label: "City", value: targetCity },
                         { icon: "map-outline" as const, label: "State", value: targetState },
@@ -1513,24 +1519,99 @@ export default function ProfileScreen() {
               </>
             )}
 
-            {/* Privacy Lock Banner for Unconnected Profiles */}
+            {/* Privacy Lock Banner for Unconnected Profiles — 1 line clickable row */}
             {isOtherProfileView && !isConnected && (
-              <View style={[styles.biodataRow, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 14, paddingVertical: 14 }]}>
-                <View style={styles.detailLeft}>
-                  <View style={[styles.biodataIconDot, { backgroundColor: "rgba(255,77,141,0.12)" }]}>
-                    <Ionicons name="lock-closed-outline" size={16} color="#FF4D8D" />
+              <TouchableOpacity
+                style={[
+                  styles.biodataRow,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: colors.border,
+                    marginTop: 14,
+                    paddingVertical: 12,
+                    paddingHorizontal: 14,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  },
+                ]}
+                activeOpacity={0.8}
+                onPress={() => setShowPrivacyLockedModal(true)}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1, paddingRight: 6 }}>
+                  <View style={[styles.biodataIconDot, { backgroundColor: "rgba(255,77,141,0.12)", width: 32, height: 32 }]}>
+                    <Ionicons name="lock-closed-outline" size={15} color="#FF4D8D" />
                   </View>
-                  <View style={{ flex: 1, paddingRight: 10 }}>
-                    <ThemedText style={[styles.detailLabel, { color: colors.text }]}>
-                      Private Information Locked
-                    </ThemedText>
-                    <ThemedText style={{ fontSize: 11, color: colors.muted, marginTop: 2, lineHeight: 16 }}>
-                      Biodata PDF & Family Information are accessible once your connection request is accepted.
-                    </ThemedText>
+                  <ThemedText style={{ fontSize: 13, fontWeight: "600", color: colors.text, flex: 1 }} numberOfLines={1}>
+                    Private Information Locked (Biodata & Family Details)
+                  </ThemedText>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+              </TouchableOpacity>
+            )}
+
+            {/* ── Privacy Locked Modal ── */}
+            <Modal visible={showPrivacyLockedModal} transparent animationType="fade">
+              <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center", padding: 20 }}>
+                <View style={{ width: "90%", maxWidth: 360, backgroundColor: colors.card, borderRadius: 20, padding: 24, alignItems: "center" }}>
+                  <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: "rgba(255,77,141,0.12)", justifyContent: "center", alignItems: "center", marginBottom: 16 }}>
+                    <Ionicons name="lock-closed" size={28} color="#FF4D8D" />
                   </View>
+
+                  <ThemedText style={{ fontSize: 18, fontWeight: "700", color: colors.text, textAlign: "center", marginBottom: 8 }}>
+                    Private Information Locked
+                  </ThemedText>
+
+                  <ThemedText style={{ fontSize: 13, color: colors.textSecondary, textAlign: "center", lineHeight: 20, marginBottom: 22 }}>
+                    Biodata PDF and Family Information are only visible once {displayName} accepts your connection request.
+                  </ThemedText>
+
+                  {/* Connection Button — exact same function & styling as profile connection button */}
+                  <TouchableOpacity
+                    style={{
+                      width: "100%",
+                      height: 48,
+                      borderRadius: 12,
+                      backgroundColor: isDark ? colors.card : "#FFFFFF",
+                      borderWidth: 1.5,
+                      borderColor: buttonConfig.tintColor,
+                      flexDirection: "row",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      gap: 8,
+                      marginBottom: 10,
+                    }}
+                    disabled={buttonConfig.disabled}
+                    onPress={() => {
+                      setShowPrivacyLockedModal(false);
+                      handleConnectPress();
+                    }}
+                  >
+                    <Ionicons name={buttonConfig.icon} size={18} color={buttonConfig.tintColor} />
+                    <ThemedText style={{ fontSize: 14, fontWeight: "700", color: buttonConfig.tintColor }}>
+                      {buttonConfig.label}
+                    </ThemedText>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={{ paddingVertical: 10 }}
+                    onPress={() => setShowPrivacyLockedModal(false)}
+                  >
+                    <ThemedText style={{ fontSize: 13.5, color: colors.muted, fontWeight: "600" }}>
+                      Close
+                    </ThemedText>
+                  </TouchableOpacity>
                 </View>
               </View>
-            )}
+            </Modal>
+
+            {/* In-App PDF Viewer Modal */}
+            <InAppPdfModal
+              visible={showPdfModal}
+              pdfUrl={pdfUrlToView}
+              title={`${displayName}'s Biodata`}
+              onClose={() => setShowPdfModal(false)}
+            />
 
             {/* Biodata row — visible to owner or connected friends */}
             {isConnected && (
@@ -2366,12 +2447,15 @@ const styles = StyleSheet.create({
   heroNameRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
     marginBottom: 2,
   },
   heroName: {
     fontSize: 20,
     fontWeight: "800",
     letterSpacing: -0.3,
+    textAlign: "center",
   },
   heroSub: {
     fontSize: 12.5,

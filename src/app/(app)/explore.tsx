@@ -122,43 +122,59 @@ export default function ExploreScreen() {
         if (usePublicApi) {
           response = await profileApi.getPublicProfiles(pageNum, 10, publicGenderFilter);
         } else {
-          const filterBody: any = {
-            page: pageNum,
-            limit: 10,
-            sortBy: "createdAt",
-            sortOrder: "desc",
-          };
-
-          if (searchText.trim()) filterBody.search = searchText.trim();
-          if (selectedEducation !== "All")
-            filterBody.education = selectedEducation;
-
-          const activeLocation =
+          const hasFilters =
+            searchText.trim() ||
+            selectedEducation !== "All" ||
             cityInput.trim() ||
-            (selectedLocation !== "All" ? selectedLocation : "");
-          if (activeLocation) filterBody.city = activeLocation;
+            (selectedLocation !== "All" && selectedLocation !== "");
 
-          response = await profileApi.searchProfiles(filterBody);
+          if (!hasFilters) {
+            response = await profileApi.getAllProfiles(pageNum, 10);
+          } else {
+            const filterBody: any = {
+              page: pageNum,
+              limit: 10,
+              sortBy: "createdAt",
+              sortOrder: "desc",
+            };
+
+            if (searchText.trim()) filterBody.search = searchText.trim();
+            if (selectedEducation !== "All")
+              filterBody.education = selectedEducation;
+
+            const activeLocation =
+              cityInput.trim() ||
+              (selectedLocation !== "All" ? selectedLocation : "");
+            if (activeLocation) filterBody.city = activeLocation;
+
+            response = await profileApi.searchProfiles(filterBody);
+          }
         }
 
         if (response.data) {
-          const newProfiles = response.data;
+          const rawList = Array.isArray(response.data) ? response.data : [];
+
+          // Strict Filter: remove any deleted or deactivated user profile
+          const activeOnly = rawList.filter((p: any) => {
+            if (!p) return false;
+            if (p.isDeleted === true || p.deletedAt || p.isActive === false) return false;
+            if (p.user && (p.user.isDeleted === true || p.user.deletedAt || p.user.isActive === false)) return false;
+            if (p.profile && (p.profile.isDeleted === true || p.profile.deletedAt || p.profile.isActive === false)) return false;
+            return true;
+          });
 
           // Filter profiles by age/gender only if explicitly filtered
-          let ageFiltered = newProfiles.filter((p: any) => {
+          let ageFiltered = activeOnly.filter((p: any) => {
             const age = getAge(p.dateOfBirth);
             const ageMatch = age >= minAge && age <= maxAge;
             return ageMatch;
           });
 
           // ── Merge received interest status onto profiles ──
-          // This ensures Accept/Decline buttons show even if backend
-          // doesn't return interestStatus in the profile list.
           if (user) {
             try {
               const receivedRes = await interestApi.getReceivedInterests(1, 200);
               if (receivedRes.data) {
-                // Build map: senderUserId -> { status, interestId }
                 const receivedMap = new Map<number, { status: string; interestId: number }>();
                 (receivedRes.data as any[]).forEach((item: any) => {
                   const senderUserId = item.profile?.userId;
@@ -171,14 +187,13 @@ export default function ExploreScreen() {
                 });
 
                 ageFiltered = ageFiltered.map((p: any) => {
-                  // Skip if backend already provided interest data
                   if (p.interestStatus) return p;
                   const received = receivedMap.get(p.userId);
                   if (received) {
                     return {
                       ...p,
                       interestStatus: received.status,
-                      isInterestSender: false, // they sent TO me
+                      isInterestSender: false,
                       interestId: received.interestId,
                     };
                   }
@@ -190,12 +205,19 @@ export default function ExploreScreen() {
             }
           }
 
+          const finalClean = ageFiltered.filter((p: any) => {
+            if (!p) return false;
+            if (p.isDeleted === true || p.deletedAt || p.isActive === false) return false;
+            if (p.user && (p.user.isDeleted === true || p.user.deletedAt || p.user.isActive === false)) return false;
+            return true;
+          });
+
           if (isRefresh || pageNum === 1) {
-            setProfiles(ageFiltered);
+            setProfiles(finalClean);
           } else {
             setProfiles((prev) => {
               const existingIds = new Set(prev.map((p) => p.id));
-              const filteredNew = ageFiltered.filter(
+              const filteredNew = finalClean.filter(
                 (p: any) => !existingIds.has(p.id),
               );
               return [...prev, ...filteredNew];
@@ -776,6 +798,20 @@ export default function ExploreScreen() {
                       activeOpacity={0.85}
                       style={styles.profileCard}
                       onPress={() => {
+                        if (!user) {
+                          Alert.alert(
+                            "Login Required",
+                            "Please login to view full profile details.",
+                            [
+                              { text: "Cancel", style: "cancel" },
+                              {
+                                text: "Login",
+                                onPress: () => router.push("/(auth)/mobile"),
+                              },
+                            ]
+                          );
+                          return;
+                        }
                         if (!profileCompleted) {
                           Alert.alert(
                             "Profile Incomplete",

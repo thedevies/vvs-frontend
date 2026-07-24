@@ -365,10 +365,10 @@ function TestimonialsSection({
             : "Found your soulmate on VVS? Share your beautiful wedding story with our community."}
         </ThemedText>
         <TouchableOpacity
-          style={[styles.pinkBtn, { marginTop: 6 }]}
+          style={[styles.pinkBtn, styles.storyCtaButton, { marginTop: 6 }]}
           onPress={() => navigateSafe("/success-stories?action=add")}
-        >
-          <ThemedText style={styles.pinkBtnText}>
+        >  
+          <ThemedText style={[styles.pinkBtnText, styles.storyCtaButtonText]}>
             {isMr ? "कथा जोडा +" : "Share Your Story +"}
           </ThemedText>
         </TouchableOpacity>
@@ -1384,6 +1384,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 14,
     alignItems: "center",
+  },
+  storyCtaButton: {
+    paddingHorizontal: 22,
+    paddingVertical: 14,
+    minWidth: 196,
+    minHeight: 48,
+    justifyContent: "center",
+  },
+  storyCtaButtonText: {
+    fontSize: 14,
+    lineHeight: 18,
   },
   pinkBtnText: { color: WHITE, fontWeight: "800", fontSize: 13 },
 

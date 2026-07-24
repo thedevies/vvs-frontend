@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View, Modal } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View, Modal, BackHandler } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
+import Constants from 'expo-constants';
 
 import CustomButton from '@/components/ui/CustomButton';
 import CustomInput from '@/components/ui/CustomInput';
@@ -25,6 +26,23 @@ export default function MobileScreen() {
   const { sendOtp } = useAuth();
   const { colors, isDark } = useAppTheme();
   const { t } = useLanguage();
+
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(app)');
+    }
+  };
+
+  useEffect(() => {
+    const onBackPress = () => {
+      handleBack();
+      return true;
+    };
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, []);
 
   const styles = getStyles(colors, isDark);
 
@@ -48,10 +66,12 @@ export default function MobileScreen() {
 
       if (finalStatus === 'granted') {
         try {
-          const tokenResult = await Notifications.getDevicePushTokenAsync();
+          const tokenResult = await Notifications.getExpoPushTokenAsync({
+            projectId: Constants.expoConfig?.extra?.eas?.projectId || '50be3265-a42d-4cb9-9032-4a0d56c6fc7c',
+          });
           const fcmToken = tokenResult.data;
           await SecureStore.setItemAsync('vvs_fcm_token', fcmToken);
-          console.log('[Push] Device Push Token saved:', fcmToken);
+          console.log('[Push] Expo Push Token saved:', fcmToken);
         } catch (tokenErr: any) {
           const mockToken = 'dev-mock-fcm-token-' + Math.random().toString(36).substring(7);
           await SecureStore.setItemAsync('vvs_fcm_token', mockToken);
@@ -107,7 +127,7 @@ export default function MobileScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         {!loading && (
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
             <Feather name="arrow-left" size={24} color={colors.text} />
           </TouchableOpacity>
         )}

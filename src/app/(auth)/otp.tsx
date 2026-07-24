@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View, TextInput } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View, TextInput, BackHandler } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 import CustomButton from '@/components/ui/CustomButton';
@@ -9,6 +9,8 @@ import { ThemedText } from '@/components/themed-text';
 import { useAuth } from '@/context/AuthContext';
 import { useAppTheme } from '@/context/ThemeContext';
 import { useLanguage } from '@/context/LanguageContext';
+
+import { CustomAlert as Alert } from '@/utils/alert';
 
 export default function OTPScreen() {
   const { type, contact, devOtp } = useLocalSearchParams<{
@@ -25,19 +27,48 @@ export default function OTPScreen() {
   const { colors, isDark } = useAppTheme();
   const { t } = useLanguage();
 
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(app)');
+    }
+  };
+
+  useEffect(() => {
+    const onBackPress = () => {
+      handleBack();
+      return true;
+    };
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, []);
+
   const styles = getStyles(colors, isDark);
 
-  const handleVerify = async () => {
+  const executeLogin = async (confirmNewDevice = false) => {
     if (otp.length !== 6) return;
 
     setError('');
     setLoading(true);
 
     try {
-      const result = await login(contact || '', otp);
+      const result = await login(contact || '', otp, confirmNewDevice);
 
       if (result.success) {
         // Redirect handled by AuthContext / root layout
+      } else if (result.hasActiveSession) {
+        Alert.alert(
+          'Active Session Detected',
+          'Previous session to previous device is active. If you login here, previous session will be logged out.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'OK',
+              onPress: () => executeLogin(true),
+            },
+          ]
+        );
       } else {
         setError(result.error || t('invalidOtpError'));
       }
@@ -47,6 +78,8 @@ export default function OTPScreen() {
       setLoading(false);
     }
   };
+
+  const handleVerify = () => executeLogin(false);
 
   const handleResend = async () => {
     if (!contact) return;
@@ -73,7 +106,7 @@ export default function OTPScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         {!loading && (
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
             <Feather name="arrow-left" size={24} color={colors.text} />
           </TouchableOpacity>
         )}

@@ -30,6 +30,10 @@ import { pickImageWithPermissionCheck } from '@/utils/imagePicker';
 type Gender = 'male' | 'female';
 type MaritalStatus = 'never_married' | 'divorced' | 'widowed';
 
+import DropdownPickerModal from '@/components/ui/DropdownPickerModal';
+import InAppPdfModal from '@/components/ui/InAppPdfModal';
+import { INDIAN_STATES, CITIES_BY_STATE, ALL_MAJOR_CITIES } from '@/constants/indiaData';
+
 const COMMON_INTERESTS = [
   'Travel', 'AI', 'Music', 'Fitness', 'Photography',
   'Reading', 'Movies', 'Cooking', 'Art', 'Sports',
@@ -126,6 +130,11 @@ export default function EditProfileScreen() {
   const [error, setError] = useState('');
   const [ageError, setAgeError] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showStateModal, setShowStateModal] = useState(false);
+  const [showCityModal, setShowCityModal] = useState(false);
+  const [targetFieldForModal, setTargetFieldForModal] = useState<'profileState' | 'piState' | 'profileCity' | 'piCity'>('profileState');
+  const [pdfUrlToView, setPdfUrlToView] = useState<string | null>(null);
+  const [showPdfModal, setShowPdfModal] = useState(false);
 
   // Biodata states
   const [uploadingBiodata, setUploadingBiodata] = useState(false);
@@ -204,8 +213,9 @@ export default function EditProfileScreen() {
     const url = biodataObj?.biodataUrl;
     if (!url) return;
     const fullUrl = url.startsWith('http') ? url : `${BASE_URL.replace('/api', '')}${url.startsWith('/') ? url : `/${url}`}`;
-    console.log('[Biodata] Opening PDF:', fullUrl);
-    await WebBrowser.openBrowserAsync(fullUrl);
+    console.log('[Biodata] Opening PDF inside app:', fullUrl);
+    setPdfUrlToView(fullUrl);
+    setShowPdfModal(true);
   };
 
   const handleUploadBiodata = async () => {
@@ -419,6 +429,37 @@ export default function EditProfileScreen() {
 
     if (!profileCompleted && !photoUri) {
       const msg = 'Please select a profile photo.';
+      setError(msg);
+      Alert.alert('Validation Error', msg, undefined, 'error');
+      return;
+    }
+
+    // Validation: Father's Mobile Number (must be exactly 10 digits if provided)
+    if (piFatherMobile.trim()) {
+      const cleanFatherMobile = piFatherMobile.trim().replace(/\D/g, '');
+      if (cleanFatherMobile.length !== 10) {
+        const msg = "Father's mobile number must be a 10-digit number.";
+        setError(msg);
+        Alert.alert('Validation Error', msg, undefined, 'error');
+        return;
+      }
+    }
+
+    // Validation: Brothers & Married Brothers (marriedBrothers <= totalBrothers)
+    const numBrothersVal = piNumBrothers.trim() ? parseInt(piNumBrothers.trim(), 10) : 0;
+    const marriedBrothersVal = piMarriedBrothers.trim() ? parseInt(piMarriedBrothers.trim(), 10) : 0;
+    if (marriedBrothersVal > numBrothersVal) {
+      const msg = `Married brothers count (${marriedBrothersVal}) cannot be greater than total brothers count (${numBrothersVal}).`;
+      setError(msg);
+      Alert.alert('Validation Error', msg, undefined, 'error');
+      return;
+    }
+
+    // Validation: Sisters & Married Sisters (marriedSisters <= totalSisters)
+    const numSistersVal = piNumSisters.trim() ? parseInt(piNumSisters.trim(), 10) : 0;
+    const marriedSistersVal = piMarriedSisters.trim() ? parseInt(piMarriedSisters.trim(), 10) : 0;
+    if (marriedSistersVal > numSistersVal) {
+      const msg = `Married sisters count (${marriedSistersVal}) cannot be greater than total sisters count (${numSistersVal}).`;
       setError(msg);
       Alert.alert('Validation Error', msg, undefined, 'error');
       return;
@@ -785,20 +826,60 @@ export default function EditProfileScreen() {
                 <CustomInput placeholder="Country" value={country} onChangeText={setCountry} />
               </View>
 
-              <View style={styles.inputGroup}>
-                <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>State</ThemedText>
-                <CustomInput placeholder="State" value={stateVal} onChangeText={setStateVal} />
-              </View>
+              <TouchableOpacity
+                style={[styles.inputGroup, { position: 'relative' }]}
+                activeOpacity={0.8}
+                onPress={() => {
+                  setTargetFieldForModal('profileState');
+                  setShowStateModal(true);
+                }}
+              >
+                <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>State *</ThemedText>
+                <View pointerEvents="none">
+                  <CustomInput
+                    placeholder="Select State"
+                    value={stateVal}
+                    onChangeText={setStateVal}
+                    editable={false}
+                  />
+                </View>
+                <Ionicons
+                  name="chevron-down"
+                  size={18}
+                  color={colors.muted}
+                  style={{ position: 'absolute', right: 14, top: 38 }}
+                />
+              </TouchableOpacity>
 
-              <View style={styles.inputGroup}>
-                <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>City/Location</ThemedText>
-                <CustomInput placeholder="City" value={city} onChangeText={setCity} />
-              </View>
+              <TouchableOpacity
+                style={[styles.inputGroup, { position: 'relative' }]}
+                activeOpacity={0.8}
+                onPress={() => {
+                  setTargetFieldForModal('profileCity');
+                  setShowCityModal(true);
+                }}
+              >
+                <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>City/Location *</ThemedText>
+                <View pointerEvents="none">
+                  <CustomInput
+                    placeholder="Select City"
+                    value={city}
+                    onChangeText={setCity}
+                    editable={false}
+                  />
+                </View>
+                <Ionicons
+                  name="chevron-down"
+                  size={18}
+                  color={colors.muted}
+                  style={{ position: 'absolute', right: 14, top: 38 }}
+                />
+              </TouchableOpacity>
             </View>
 
             {/* ── Interests Card ── */}
             <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <ThemedText style={[styles.cardTitle, { color: colors.text }]}>Interests & Hobbies *</ThemedText>
+              <ThemedText style={[styles.cardTitle, { color: colors.text }]}>Interests &amp; Hobbies *</ThemedText>
 
               <View style={styles.interestContainer}>
                 {Array.from(new Set([...COMMON_INTERESTS, ...interests])).map((item) => {
@@ -848,24 +929,59 @@ export default function EditProfileScreen() {
               <ThemedText style={[styles.cardTitle, { color: colors.text }]}>Family &amp; Personal Details</ThemedText>
 
               <View style={styles.inputGroup}>
-                <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Email</ThemedText>
-                <CustomInput placeholder="Email address" value={piEmail} onChangeText={setPiEmail} keyboardType="email-address" autoCapitalize="none" />
-              </View>
-
-              <View style={styles.inputGroup}>
                 <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Address</ThemedText>
                 <CustomInput placeholder="Residential address" value={piAddress} onChangeText={setPiAddress} />
               </View>
 
-              <View style={styles.inputGroup}>
+              <TouchableOpacity
+                style={[styles.inputGroup, { position: 'relative' }]}
+                activeOpacity={0.8}
+                onPress={() => {
+                  setTargetFieldForModal('piCity');
+                  setShowCityModal(true);
+                }}
+              >
                 <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>City</ThemedText>
-                <CustomInput placeholder="City" value={piCity} onChangeText={setPiCity} />
-              </View>
+                <View pointerEvents="none">
+                  <CustomInput
+                    placeholder="Select City"
+                    value={piCity}
+                    onChangeText={setPiCity}
+                    editable={false}
+                  />
+                </View>
+                <Ionicons
+                  name="chevron-down"
+                  size={18}
+                  color={colors.muted}
+                  style={{ position: 'absolute', right: 14, top: 38 }}
+                />
+              </TouchableOpacity>
 
-              <View style={styles.inputGroup}>
+              <TouchableOpacity
+                style={[styles.inputGroup, { position: 'relative' }]}
+                activeOpacity={0.8}
+                onPress={() => {
+                  setTargetFieldForModal('piState');
+                  setShowStateModal(true);
+                }}
+              >
                 <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>State</ThemedText>
-                <CustomInput placeholder="State" value={piState} onChangeText={setPiState} />
-              </View>
+                <View pointerEvents="none">
+                  <CustomInput
+                    placeholder="Select State"
+                    value={piState}
+                    onChangeText={setPiState}
+                    editable={false}
+                  />
+                </View>
+                <Ionicons
+                  name="chevron-down"
+                  size={18}
+                  color={colors.muted}
+                  style={{ position: 'absolute', right: 14, top: 38 }}
+                />
+              </TouchableOpacity>
 
               <View style={[styles.inputGroup, { marginTop: 8 }]}>
                 <ThemedText style={[styles.inputLabel, { color: colors.textSecondary, fontWeight: '700' }]}>Father's Details</ThemedText>
@@ -875,8 +991,14 @@ export default function EditProfileScreen() {
                 <CustomInput placeholder="Father's full name" value={piFatherName} onChangeText={setPiFatherName} />
               </View>
               <View style={styles.inputGroup}>
-                <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Father's Mobile</ThemedText>
-                <CustomInput placeholder="Father's mobile number" value={piFatherMobile} onChangeText={setPiFatherMobile} keyboardType="phone-pad" />
+                <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Father's Mobile (10 Digits)</ThemedText>
+                <CustomInput
+                  placeholder="10-digit mobile number"
+                  value={piFatherMobile}
+                  onChangeText={(val) => setPiFatherMobile(val.replace(/\D/g, ''))}
+                  keyboardType="phone-pad"
+                  maxLength={10}
+                />
               </View>
               <View style={styles.inputGroup}>
                 <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Father's Occupation</ThemedText>
@@ -901,21 +1023,73 @@ export default function EditProfileScreen() {
               <View style={styles.siblingsRow}>
                 <View style={styles.siblingsCol}>
                   <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Brothers</ThemedText>
-                  <CustomInput placeholder="Total" value={piNumBrothers} onChangeText={setPiNumBrothers} keyboardType="numeric" maxLength={2} />
+                  <CustomInput
+                    placeholder="Total"
+                    value={piNumBrothers}
+                    onChangeText={(val) => {
+                      const cleanVal = val.replace(/\D/g, '');
+                      setPiNumBrothers(cleanVal);
+                      if (cleanVal && piMarriedBrothers && parseInt(piMarriedBrothers, 10) > parseInt(cleanVal, 10)) {
+                        setPiMarriedBrothers(cleanVal);
+                      }
+                    }}
+                    keyboardType="numeric"
+                    maxLength={2}
+                  />
                 </View>
                 <View style={styles.siblingsCol}>
                   <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Married</ThemedText>
-                  <CustomInput placeholder="Married" value={piMarriedBrothers} onChangeText={setPiMarriedBrothers} keyboardType="numeric" maxLength={2} />
+                  <CustomInput
+                    placeholder="Married"
+                    value={piMarriedBrothers}
+                    onChangeText={(val) => {
+                      const cleanVal = val.replace(/\D/g, '');
+                      const totalB = piNumBrothers ? parseInt(piNumBrothers, 10) : 0;
+                      if (cleanVal && parseInt(cleanVal, 10) > totalB) {
+                        setPiMarriedBrothers(String(totalB));
+                      } else {
+                        setPiMarriedBrothers(cleanVal);
+                      }
+                    }}
+                    keyboardType="numeric"
+                    maxLength={2}
+                  />
                 </View>
               </View>
               <View style={styles.siblingsRow}>
                 <View style={styles.siblingsCol}>
                   <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Sisters</ThemedText>
-                  <CustomInput placeholder="Total" value={piNumSisters} onChangeText={setPiNumSisters} keyboardType="numeric" maxLength={2} />
+                  <CustomInput
+                    placeholder="Total"
+                    value={piNumSisters}
+                    onChangeText={(val) => {
+                      const cleanVal = val.replace(/\D/g, '');
+                      setPiNumSisters(cleanVal);
+                      if (cleanVal && piMarriedSisters && parseInt(piMarriedSisters, 10) > parseInt(cleanVal, 10)) {
+                        setPiMarriedSisters(cleanVal);
+                      }
+                    }}
+                    keyboardType="numeric"
+                    maxLength={2}
+                  />
                 </View>
                 <View style={styles.siblingsCol}>
                   <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Married</ThemedText>
-                  <CustomInput placeholder="Married" value={piMarriedSisters} onChangeText={setPiMarriedSisters} keyboardType="numeric" maxLength={2} />
+                  <CustomInput
+                    placeholder="Married"
+                    value={piMarriedSisters}
+                    onChangeText={(val) => {
+                      const cleanVal = val.replace(/\D/g, '');
+                      const totalS = piNumSisters ? parseInt(piNumSisters, 10) : 0;
+                      if (cleanVal && parseInt(cleanVal, 10) > totalS) {
+                        setPiMarriedSisters(String(totalS));
+                      } else {
+                        setPiMarriedSisters(cleanVal);
+                      }
+                    }}
+                    keyboardType="numeric"
+                    maxLength={2}
+                  />
                 </View>
               </View>
             </View>
@@ -1160,6 +1334,50 @@ export default function EditProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* State Dropdown Modal */}
+      <DropdownPickerModal
+        visible={showStateModal}
+        title="Select State"
+        options={INDIAN_STATES}
+        selectedValue={targetFieldForModal === 'profileState' ? stateVal : piState}
+        onSelect={(selectedState) => {
+          if (targetFieldForModal === 'profileState') {
+            setStateVal(selectedState);
+          } else {
+            setPiState(selectedState);
+          }
+        }}
+        onClose={() => setShowStateModal(false)}
+      />
+
+      {/* City Dropdown Modal */}
+      <DropdownPickerModal
+        visible={showCityModal}
+        title="Select City"
+        options={
+          (targetFieldForModal === 'profileCity' ? stateVal : piState) && CITIES_BY_STATE[(targetFieldForModal === 'profileCity' ? stateVal : piState)]
+            ? CITIES_BY_STATE[(targetFieldForModal === 'profileCity' ? stateVal : piState)]
+            : ALL_MAJOR_CITIES
+        }
+        selectedValue={targetFieldForModal === 'profileCity' ? city : piCity}
+        onSelect={(selectedCity) => {
+          if (targetFieldForModal === 'profileCity') {
+            setCity(selectedCity);
+          } else {
+            setPiCity(selectedCity);
+          }
+        }}
+        onClose={() => setShowCityModal(false)}
+      />
+
+      {/* In-App PDF Viewer Modal */}
+      <InAppPdfModal
+        visible={showPdfModal}
+        pdfUrl={pdfUrlToView}
+        title="My Biodata PDF"
+        onClose={() => setShowPdfModal(false)}
+      />
     </View>
   );
 }

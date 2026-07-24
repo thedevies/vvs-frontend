@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { Alert, Platform } from 'react-native';
 import * as Device from 'expo-device';
 import * as SecureStore from 'expo-secure-store';
+import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import { storage } from '@/utils/storage';
 import { authApi, profileApi, BASE_URL, setCachedToken, registerSessionExpiredCallback, notificationApi } from '@/utils/api';
 import type { User } from '@/utils/types';
@@ -12,7 +14,7 @@ type AuthContextType = {
   user: User | null;
   profileCompleted: boolean;
   sendOtp: (mobile: string) => Promise<{ success: boolean; otp?: string; error?: string }>;
-  login: (mobile: string, otp: string) => Promise<{ success: boolean; error?: string }>;
+  login: (mobile: string, otp: string, confirmNewDevice?: boolean) => Promise<{ success: boolean; hasActiveSession?: boolean; message?: string; error?: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   completeProfile: () => void;
@@ -45,11 +47,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const syncDeviceTokenWithBackend = async () => {
     try {
-      const fcmToken = await SecureStore.getItemAsync('vvs_fcm_token');
-      if (!fcmToken) {
-        console.log('[Push] No stored FCM token to sync.');
+      // 1. Check and request notification permissions dynamically
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+
+      if (finalStatus !== 'granted') {
+        console.log('[Push] Notification permission not granted. Cannot sync token.');
         return;
       }
+
+      // 2. Fetch the Expo Push Token dynamically
+      const tokenResult = await Notifications.getExpoPushTokenAsync({
+        projectId: Constants.expoConfig?.extra?.eas?.projectId || '50be3265-a42d-4cb9-9032-4a0d56c6fc7c',
+      });
+      const fcmToken = tokenResult.data;
+
+      if (!fcmToken) {
+        console.warn('[Push] Failed to retrieve dynamic push token.');
+        return;
+      }
+
+      // 3. Cache it locally in SecureStore
+      await SecureStore.setItemAsync('vvs_fcm_token', fcmToken);
 
       const deviceId = getDeviceId();
       const platform = Platform.OS === 'ios' ? 'IOS' : 'ANDROID';
@@ -164,23 +187,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const login = useCallback(async (mobile: string, otp: string) => {
+  const login = useCallback(async (mobile: string, otp: string, confirmNewDevice?: boolean) => {
     try {
       const deviceId = getDeviceId();
 
       // Get IP address — just pass a placeholder since backend requires it
       const ipAddress = '0.0.0.0';
 
-      console.log('[Auth] Verifying OTP for', mobile);
+      console.log('[Auth] Verifying OTP for', mobile, 'confirmNewDevice:', confirmNewDevice);
 
-      const response = await authApi.verifyOtp({
+      const response: any = await authApi.verifyOtp({
         mobile,
         otp,
         deviceId,
         ipAddress,
+        confirmNewDevice,
       });
 
       console.log('[Auth] Verify response:', JSON.stringify(response));
+
+      // Active session warning on another device
+      if (response?.hasActiveSession) {
+        return {
+          success: false,
+          hasActiveSession: true,
+          message: response.message || 'Previous session to previous device is active. If you login here, previous session will be logged out.',
+        };
+      }
 
       // Backend returns errors as 200 OK with just { message: '...' }
       // Must check if accessToken exists in the response
