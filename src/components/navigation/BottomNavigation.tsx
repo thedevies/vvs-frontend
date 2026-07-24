@@ -13,6 +13,7 @@ import { eventEmitter } from "@/utils/events";
 import { useAppTheme } from "@/context/ThemeContext";
 
 import { useLanguage } from "@/context/LanguageContext";
+import { pickImageWithPermissionCheck } from "@/utils/imagePicker";
 
 type BottomNavigationProps = {
   activeRouteOverride?: string;
@@ -56,19 +57,13 @@ export default function BottomNavigation({ activeRouteOverride, containerStyle }
     }
 
     try {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permissionResult.granted) {
-        Alert.alert("Permission Denied", "Media library access is required to upload photos.");
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
+      const result = await pickImageWithPermissionCheck({
         mediaTypes: ['images'],
         allowsEditing: true,
         quality: 0.8,
       });
 
-      if (!result.canceled && result.assets && result.assets.length > 0) {
+      if (result && !result.canceled && result.assets && result.assets.length > 0) {
         const photoUri = result.assets[0].uri;
         console.log("[BottomNav] Uploading gallery photo:", photoUri);
         setUploading(true);
@@ -174,7 +169,14 @@ export default function BottomNavigation({ activeRouteOverride, containerStyle }
       {/* Plus Button Action Modal */}
       <Modal visible={showPlusActionModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[
+            styles.modalCard,
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+              paddingBottom: insets.bottom > 0 ? insets.bottom + 20 : 28,
+            }
+          ]}>
             <View style={styles.modalHeaderRow}>
               <ThemedText style={[styles.modalTitle, { color: colors.text }]}>{t('quickAction')}</ThemedText>
               <TouchableOpacity onPress={() => setShowPlusActionModal(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>

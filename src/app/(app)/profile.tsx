@@ -28,6 +28,7 @@ import { profileApi, interestApi, personalInformationApi, successStoryApi, BASE_
 import type { UserPhoto } from "@/utils/types";
 import { eventEmitter } from "@/utils/events";
 import { useAppTheme } from "@/context/ThemeContext";
+import { pickImageWithPermissionCheck } from "@/utils/imagePicker";
 
 const { width: SW } = Dimensions.get("window");
 
@@ -273,25 +274,13 @@ export default function ProfileScreen() {
 
   const handleUploadGalleryPhoto = async () => {
     try {
-      const permissionResult =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permissionResult.granted) {
-        Alert.alert(
-          isMr ? "परवानगी नाकारली" : "Permission Denied",
-          isMr
-            ? "फोटो अपलोड करण्यासाठी गॅलरी प्रवेश आवश्यक आहे."
-            : "Camera roll access is required to upload photos."
-        );
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      const result = await pickImageWithPermissionCheck({
+        mediaTypes: ['images'],
         allowsEditing: true,
         quality: 0.8,
       });
 
-      if (!result.canceled && result.assets && result.assets.length > 0) {
+      if (result && !result.canceled && result.assets && result.assets.length > 0) {
         const photoUri = result.assets[0].uri;
         setUploadingGalleryPhoto(true);
 

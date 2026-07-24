@@ -24,6 +24,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { profileApi, notificationApi, successStoryApi, BASE_URL } from "@/utils/api";
 import AuthModal from "@/components/ui/AuthModal";
 import { useAppTheme } from "@/context/ThemeContext";
+import { pickImageWithPermissionCheck } from "@/utils/imagePicker";
 
 const { width: SW, height: SH } = Dimensions.get("window");
 
@@ -627,23 +628,13 @@ export default function HomeScreen() {
 
   const handleUploadGalleryPhoto = async () => {
     try {
-      const permissionResult =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permissionResult.granted) {
-        Alert.alert(
-          "Permission Denied",
-          "Camera roll access is required to upload photos.",
-        );
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      const result = await pickImageWithPermissionCheck({
+        mediaTypes: ['images'],
         allowsEditing: true,
         quality: 0.8,
       });
 
-      if (!result.canceled && result.assets && result.assets.length > 0) {
+      if (result && !result.canceled && result.assets && result.assets.length > 0) {
         const photoUri = result.assets[0].uri;
         console.log("[Home] Uploading gallery photo:", photoUri);
         setUploadingGalleryPhoto(true);

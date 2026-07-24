@@ -14,7 +14,13 @@
     "android": {
       "icon": "./assets/images/logo.png",
       "package": "com.vvs.matrimony",
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "RECEIVE_BOOT_COMPLETED",
+        "POST_NOTIFICATIONS",
+        "VIBRATE",
+        "WAKE_LOCK"
+      ]
     },
     "web": {
       "output": "static",
@@ -22,6 +28,13 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/logo.png",
+          "color": "#FF4D8D"
+        }
+      ],
       [
         "expo-splash-screen",
         {

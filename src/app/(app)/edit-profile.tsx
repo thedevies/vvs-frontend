@@ -25,6 +25,7 @@ import { ThemedText } from '@/components/themed-text';
 import { useAuth } from '@/context/AuthContext';
 import { profileApi, personalInformationApi, BASE_URL } from '@/utils/api';
 import { useAppTheme } from '@/context/ThemeContext';
+import { pickImageWithPermissionCheck } from '@/utils/imagePicker';
 
 type Gender = 'male' | 'female';
 type MaritalStatus = 'never_married' | 'divorced' | 'widowed';
@@ -304,20 +305,14 @@ export default function EditProfileScreen() {
     : null;
 
   const pickAndUploadImage = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert('Permission Needed', 'Please allow access to your photo library.');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
+    const result = await pickImageWithPermissionCheck({
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
     });
 
-    if (!result.canceled && result.assets[0]) {
+    if (result && !result.canceled && result.assets[0]) {
       const uri = result.assets[0].uri;
       setPhotoUri(uri);
       // Auto-upload immediately

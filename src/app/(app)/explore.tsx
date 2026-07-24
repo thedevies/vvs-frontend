@@ -80,6 +80,8 @@ export default function ExploreScreen() {
   const [minAge, setMinAge] = useState(MIN_AGE_LIMIT);
   const [maxAge, setMaxAge] = useState(MAX_AGE_LIMIT);
 
+  const [publicGenderFilter, setPublicGenderFilter] = useState<'ALL' | 'MALE' | 'FEMALE'>('ALL');
+
   // Dynamic profiles fetching state
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(false);
@@ -118,7 +120,7 @@ export default function ExploreScreen() {
         let response;
 
         if (usePublicApi) {
-          response = await profileApi.getPublicProfiles(pageNum, 10);
+          response = await profileApi.getPublicProfiles(pageNum, 10, publicGenderFilter);
         } else {
           const filterBody: any = {
             page: pageNum,
@@ -222,6 +224,7 @@ export default function ExploreScreen() {
       maxAge,
       user,
       searchText,
+      publicGenderFilter,
     ],
   );
 
@@ -237,6 +240,7 @@ export default function ExploreScreen() {
     profileCompleted,
     user,
     searchText,
+    publicGenderFilter,
   ]);
 
   const onRefresh = useCallback(() => {
@@ -464,6 +468,32 @@ export default function ExploreScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* ── Public Gender Filter Bar (For unauthenticated / non-logged in users) ── */}
+        {(!user || !profileCompleted) && (
+          <View style={styles.publicFilterContainer}>
+            {(['ALL', 'MALE', 'FEMALE'] as const).map((g) => (
+              <TouchableOpacity
+                key={g}
+                style={[
+                  styles.publicFilterChip,
+                  publicGenderFilter === g && styles.publicFilterChipActive,
+                ]}
+                onPress={() => setPublicGenderFilter(g)}
+                activeOpacity={0.8}
+              >
+                <ThemedText
+                  style={[
+                    styles.publicFilterChipText,
+                    publicGenderFilter === g && styles.publicFilterChipTextActive,
+                  ]}
+                >
+                  {g === 'ALL' ? 'ALL' : g === 'MALE' ? 'MALE' : 'FEMALE'}
+                </ThemedText>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         {/* ── Search ───────────────────────────────────────────── */}
         {searchOpen && (
@@ -1402,4 +1432,32 @@ const getStyles = (colors: any) =>
       marginBottom: 20,
     },
     loadMoreText: { color: ACCENT, fontSize: 13.5, fontWeight: "700" },
+    publicFilterContainer: {
+      flexDirection: 'row',
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+      gap: 10,
+    },
+    publicFilterChip: {
+      flex: 1,
+      alignItems: 'center',
+      paddingVertical: 10,
+      borderRadius: 16,
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    publicFilterChipActive: {
+      backgroundColor: ACCENT,
+      borderColor: ACCENT,
+    },
+    publicFilterChipText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: colors.textSecondary,
+    },
+    publicFilterChipTextActive: {
+      color: '#FFFFFF',
+      fontWeight: '800',
+    },
   });

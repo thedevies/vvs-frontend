@@ -335,8 +335,13 @@ export const profileApi = {
   getPartnerPreferenceProfiles: (page: number, limit: number) =>
     request<ApiResponse<UserProfile[]>>(`/profile/getPartnerPreferenceProfiles?page=${page}&limit=${limit}`),
 
-  getPublicProfiles: (page: number, limit: number) =>
-    request<ApiResponse<UserProfile[]>>(`/profile/public/list?page=${page}&limit=${limit}`, {}, false),
+  getPublicProfiles: (page: number, limit: number, gender?: string) => {
+    let url = `/profile/public?page=${page}&limit=${limit}`;
+    if (gender && gender !== 'ALL') {
+      url += `&gender=${gender.toUpperCase()}`;
+    }
+    return request<ApiResponse<UserProfile[]>>(url, {}, false);
+  },
 
   deletedOrDeactivateProfile: (flag: 'deactive' | 'delete') =>
     request<ApiResponse>(`/profile/deletedOrDeactivateProfile?flag=${flag}`, {
@@ -389,7 +394,7 @@ export const notificationApi = {
     request<ApiResponse>(`/notification?page=${page}&limit=${limit}`),
 
   getUnreadCount: () =>
-    request<ApiResponse>('/notification/unread-count'),
+    request<{ count?: number; message?: string }>('/notification/unread-count'),
 
   markAsRead: (id: number) =>
     request<ApiResponse>(`/notification/${id}/read`, {

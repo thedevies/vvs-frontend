@@ -20,6 +20,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { ThemedText } from "@/components/themed-text";
 import { useAppTheme } from "@/context/ThemeContext";
 import { successStoryApi, type SuccessStoryData } from "@/utils/api";
+import { pickImageWithPermissionCheck } from "@/utils/imagePicker";
 
 const ACCENT = "#FF4D8D";
 const ACCENT_SOFT = "rgba(255, 77, 141, 0.10)";
@@ -198,14 +199,12 @@ export default function SuccessStoriesScreen() {
   };
 
   const pickPhotos = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) { Alert.alert("Permission needed"); return; }
-    const res = await ImagePicker.launchImageLibraryAsync({
+    const res = await pickImageWithPermissionCheck({
       mediaTypes: ["images"],
       allowsMultipleSelection: true,
       quality: 0.8,
     });
-    if (!res.canceled) {
+    if (res && !res.canceled) {
       const uris = res.assets.map((a) => a.uri);
       setNewPhotoUris((prev) => [...prev, ...uris].slice(0, 5));
     }

@@ -5,6 +5,9 @@ export default function CustomInput({
   placeholder,
   secureTextEntry,
   style,
+  autoComplete = "off",
+  textContentType = "none",
+  importantForAutofill = "no",
   ...props
 }: TextInputProps) {
   const { colors } = useAppTheme();
@@ -16,6 +19,9 @@ export default function CustomInput({
         placeholderTextColor={colors.muted}
         style={[styles.input, { color: colors.text }, style]}
         secureTextEntry={secureTextEntry}
+        autoComplete={autoComplete}
+        textContentType={textContentType}
+        importantForAutofill={importantForAutofill}
         {...props}
       />
     </View>
